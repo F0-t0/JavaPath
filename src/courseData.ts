@@ -32,6 +32,7 @@ export type LessonExample = {
   whyItWorks: string
   code: string
   output: string
+  stdin?: string
 }
 
 export type PracticeTask = {
@@ -42,9 +43,20 @@ export type PracticeTask = {
   instructions: string[]
   starterCode: string
   expectedOutput: string
+  stdin?: string
   successMessage: string
   hints: string[]
   xp: number
+  validation?: {
+    placeholdersDisallowed?: boolean
+    minPrintlnCount?: number
+    requiredIncludes?: string[]
+    requiredPatterns?: string[]
+    forbiddenIncludes?: string[]
+    exactOutputLines?: string[]
+    includesOutputPhrases?: string[]
+    failureMessage: string
+  }
 }
 
 export type LessonData = {
@@ -87,12 +99,12 @@ export const courseTracks: CourseTrack[] = [
     id: 'fundamenty',
     level: 'Poziom 1',
     title: 'Fundamenty',
-    summary: 'Pierwsze programy, zmienne, typy danych i wejscie od uzytkownika.',
+    summary: 'Pierwsze programy, zmienne, typy danych i wejście od użytkownika.',
     completion: 0,
     modules: [
       {
         id: 'hello-world',
-        title: 'Twoj pierwszy program',
+        title: 'Twój pierwszy program',
         subtitle: 'Hello, World! i jak startuje Java',
         status: 'active',
         xp: 120,
@@ -100,7 +112,7 @@ export const courseTracks: CourseTrack[] = [
       {
         id: 'zmienne',
         title: 'Zmienne',
-        subtitle: 'Jak program zapamietuje dane',
+        subtitle: 'Jak program zapamiętuje dane',
         status: 'locked',
         xp: 120,
       },
@@ -114,13 +126,13 @@ export const courseTracks: CourseTrack[] = [
       {
         id: 'operatory',
         title: 'Operatory',
-        subtitle: 'Matematyka i porownania w Javie',
+        subtitle: 'Matematyka i porównania w Javie',
         status: 'locked',
         xp: 140,
       },
       {
         id: 'scanner',
-        title: 'Wejscie od uzytkownika',
+        title: 'Wejście od użytkownika',
         subtitle: 'Pobieranie danych przez Scanner',
         status: 'locked',
         xp: 150,
@@ -131,7 +143,7 @@ export const courseTracks: CourseTrack[] = [
     id: 'logika',
     level: 'Poziom 2',
     title: 'Logika i sterowanie',
-    summary: 'Warunki, petle i sterowanie przeplywem programu.',
+    summary: 'Warunki, pętle i sterowanie przepływem programu.',
     completion: 0,
     modules: [
       {
@@ -144,13 +156,13 @@ export const courseTracks: CourseTrack[] = [
       {
         id: 'switch',
         title: 'Switch',
-        subtitle: 'Wiele sciezek programu',
+        subtitle: 'Wiele ścieżek programu',
         status: 'locked',
         xp: 160,
       },
       {
         id: 'petle',
-        title: 'Petle',
+        title: 'Pętle',
         subtitle: 'for, while, do-while',
         status: 'locked',
         xp: 180,
@@ -167,13 +179,13 @@ export const courseTracks: CourseTrack[] = [
       {
         id: 'metody',
         title: 'Metody',
-        subtitle: 'Budowanie mniejszych blokow kodu',
+        subtitle: 'Budowanie mniejszych bloków kodu',
         status: 'locked',
         xp: 210,
       },
       {
         id: 'return',
-        title: 'Wartosc zwracana',
+        title: 'Wartość zwracana',
         subtitle: 'Jak metoda oddaje wynik',
         status: 'locked',
         xp: 220,
@@ -184,7 +196,7 @@ export const courseTracks: CourseTrack[] = [
     id: 'oop',
     level: 'Poziom 4',
     title: 'OOP i dalej',
-    summary: 'Klasy, obiekty, kolekcje i wyjatki.',
+    summary: 'Klasy, obiekty, kolekcje i wyjątki.',
     completion: 0,
     modules: [
       {
@@ -209,13 +221,13 @@ export const dashboardStats = {
   xp: 0,
   streak: 0,
   userName: 'Nowy kursant',
-  nextModule: 'Twoj pierwszy program',
+  nextModule: 'Twój pierwszy program',
   challengeTitle: 'Pierwsze wyzwanie czeka po module 1',
 }
 
 export const lesson: LessonData = {
-  breadcrumb: ['Poziom 1', 'Fundamenty', 'Twoj pierwszy program'],
-  title: 'Twoj pierwszy program',
+  breadcrumb: ['Poziom 1', 'Fundamenty', 'Twój pierwszy program'],
+  title: 'Twój pierwszy program',
   duration: '15-20 minut',
   steps: ['Hook', 'Explain', 'Show', 'Practice', 'Wrap-up'],
   hook: {
@@ -291,6 +303,12 @@ export const lesson: LessonData = {
           'Pierwsza linia powinna zaczynac sie od: public class Main',
         ],
         xp: 30,
+        validation: {
+          placeholdersDisallowed: true,
+          requiredIncludes: ['public class Main', 'System.out.println("Witaj, JavaPath!");'],
+          exactOutputLines: ['Witaj, JavaPath!'],
+          failureMessage: 'Uzupelnij nazwe klasy Main i wpisz dokladnie komunikat Witaj, JavaPath!.',
+        },
       },
       {
         id: 'task-scratch',
@@ -312,6 +330,11 @@ export const lesson: LessonData = {
           'Druga linia powinna wygladac tak: System.out.println("Kod dziala.");',
         ],
         xp: 40,
+        validation: {
+          minPrintlnCount: 2,
+          includesOutputPhrases: ['start program', 'kod dziala'],
+          failureMessage: 'Patrz na wynik: program ma wypisac dwie linie o starcie programu i tym, ze kod dziala.',
+        },
       },
       {
         id: 'task-debug',
@@ -333,6 +356,12 @@ export const lesson: LessonData = {
           'Na koncu instrukcji println musi byc srednik.',
         ],
         xp: 50,
+        validation: {
+          forbiddenIncludes: ['system.out'],
+          requiredIncludes: ['System.out.println("Mam pierwszy program");'],
+          exactOutputLines: ['Mam pierwszy program'],
+          failureMessage: 'Napraw println tak, aby wypisywal dokladnie: Mam pierwszy program.',
+        },
       },
     ],
   },

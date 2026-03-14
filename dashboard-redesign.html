@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="pl">
+<html lang="pl" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JavaPath Dashboard Redesign</title>
+    <title>JavaPath Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -12,31 +12,218 @@
     />
     <style>
       :root {
-        --bg: #0e0e12;
-        --panel: #16161e;
-        --panel-alt: #1b1b25;
-        --border: #222230;
-        --border-strong: #303044;
-        --text: #e8e8f0;
-        --muted: #6b6b85;
-        --muted-soft: #8a8aa4;
-        --orange: #f89820;
-        --orange-soft: rgba(248, 152, 32, 0.14);
-        --teal: #00d4b4;
-        --teal-soft: rgba(0, 212, 180, 0.14);
-        --red: #ff4757;
-        --locked: #2a2a3a;
-        --radius: 12px;
-        --shadow:
-          0 16px 40px rgba(0, 0, 0, 0.28),
-          0 6px 18px rgba(0, 0, 0, 0.2);
-        --shadow-hover:
-          0 22px 50px rgba(0, 0, 0, 0.34),
-          0 10px 24px rgba(0, 0, 0, 0.24);
+        color-scheme: dark;
+        --font-body: "Inter", sans-serif;
+        --font-heading: "JetBrains Mono", monospace;
+        --radius-sm: 10px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --transition-fast: 200ms ease;
+        --color-bg: #0e0e12;
+        --color-bg-glow-start: rgba(248, 152, 32, 0.08);
+        --color-bg-glow-end: rgba(0, 212, 180, 0.08);
+        --color-text: #e8e8f0;
+        --color-text-strong: #f4f4fb;
+        --color-text-body: #c9cada;
+        --color-text-secondary: #8f92aa;
+        --color-text-muted: #6b6b85;
+        --color-text-label: #6b6b85;
+        --color-brand: #f89820;
+        --color-brand-strong: #e07a10;
+        --color-brand-soft: rgba(248, 152, 32, 0.14);
+        --color-success: #00d4b4;
+        --color-success-strong: #00a896;
+        --color-success-soft: rgba(0, 212, 180, 0.14);
+        --color-danger: #ff4757;
+        --color-danger-soft: rgba(255, 71, 87, 0.14);
+        --color-sidebar-bg: #0e0e12;
+        --color-sidebar-border: #222230;
+        --color-sidebar-label: #6b6b85;
+        --color-sidebar-card: #16161e;
+        --color-sidebar-card-border: #222230;
+        --color-sidebar-badge-bg: rgba(248, 152, 32, 0.12);
+        --color-sidebar-badge-text: #f89820;
+        --color-sidebar-title: #e8e8f0;
+        --color-sidebar-subtitle: #6b6b85;
+        --color-sidebar-active-bg: #1c1c26;
+        --color-sidebar-active-border: #f89820;
+        --color-sidebar-icon: #8f92aa;
+        --color-sidebar-icon-hover: #e8e8f0;
+        --color-sidebar-tooltip-bg: #111118;
+        --color-sidebar-tooltip-border: #222230;
+        --color-sidebar-tooltip-text: #f4f4fb;
+        --color-topbar-bg: rgba(14, 14, 18, 0.88);
+        --color-topbar-border: #222230;
+        --color-breadcrumb: #8f92aa;
+        --color-breadcrumb-strong: #f4f4fb;
+        --color-pill-streak-bg: rgba(248, 152, 32, 0.12);
+        --color-pill-streak-border: rgba(248, 152, 32, 0.34);
+        --color-pill-streak-text: #f89820;
+        --color-pill-xp-bg: rgba(0, 212, 180, 0.12);
+        --color-pill-xp-border: rgba(0, 212, 180, 0.34);
+        --color-pill-xp-text: #00d4b4;
+        --color-hero-bg: linear-gradient(120deg, #15161d 0%, #191b25 55%, #1c1e2a 100%);
+        --color-hero-border: #222230;
+        --color-hero-label: #6b6b85;
+        --color-hero-title: #f4f4fb;
+        --color-hero-subtitle: #8f92aa;
+        --color-progress-track: #2a2a3a;
+        --color-progress-fill: #f89820;
+        --color-button-primary-bg: #f89820;
+        --color-button-primary-text: #0e0e12;
+        --color-button-primary-hover-bg: #e07a10;
+        --color-button-secondary-bg: transparent;
+        --color-button-secondary-border: #2d3040;
+        --color-button-secondary-text: #e8e8f0;
+        --color-button-secondary-hover-bg: rgba(255, 255, 255, 0.06);
+        --color-button-secondary-hover-text: #f4f4fb;
+        --color-card-bg: #16161e;
+        --color-card-border: #222230;
+        --color-card-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+        --color-card-shadow-hover: 0 20px 44px rgba(0, 0, 0, 0.3);
+        --color-card-label: #8f92aa;
+        --color-card-title: #f4f4fb;
+        --color-card-body: #c9cada;
+        --color-card-secondary: #8f92aa;
+        --color-card-icon-bg: rgba(255, 255, 255, 0.05);
+        --color-card-icon: #f89820;
+        --color-progress-completed: #00d4b4;
+        --color-progress-active: #f89820;
+        --color-progress-locked: #2a2a3a;
+        --color-progress-dot-completed: #00d4b4;
+        --color-progress-dot-active: #f89820;
+        --color-progress-dot-locked: #2a2a3a;
+        --color-review-empty-icon-bg: rgba(0, 212, 180, 0.1);
+        --color-review-empty-icon-stroke: #00d4b4;
+        --color-challenge-badge-bg: rgba(248, 152, 32, 0.12);
+        --color-challenge-badge-border: rgba(248, 152, 32, 0.28);
+        --color-challenge-badge-text: #f89820;
+        --color-map-bg: #16161e;
+        --color-map-border: #222230;
+        --color-map-line: #222230;
+        --color-map-line-completed: #00d4b4;
+        --color-map-legend: #8f92aa;
+        --color-map-node-name: #d8d9e7;
+        --color-map-node-completed-bg: #00d4b4;
+        --color-map-node-completed-text: #ffffff;
+        --color-map-node-active-bg: #f89820;
+        --color-map-node-active-text: #0e0e12;
+        --color-map-node-locked-bg: #2a2a3a;
+        --color-map-node-locked-border: transparent;
+        --color-map-node-locked-text: #8f92aa;
+        --color-map-status-completed: #00d4b4;
+        --color-map-status-active: #f89820;
+        --color-map-node-ring-1: rgba(248, 152, 32, 0.3);
+        --color-map-node-ring-2: rgba(248, 152, 32, 0);
+        --color-scrollbar-thumb: #3d4051;
+        --color-scrollbar-thumb-hover: #6b6b85;
+        --color-scrollbar-track: transparent;
       }
 
-      * {
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --color-bg: #f7f7fb;
+        --color-bg-glow-start: rgba(248, 152, 32, 0.08);
+        --color-bg-glow-end: rgba(0, 212, 180, 0.08);
+        --color-text: #1a1a2e;
+        --color-text-strong: #1a1a2e;
+        --color-text-body: #4a4a6a;
+        --color-text-secondary: #6b6b85;
+        --color-text-muted: #9999aa;
+        --color-text-label: #9999aa;
+        --color-sidebar-bg: #f0f0f5;
+        --color-sidebar-border: #e2e2ea;
+        --color-sidebar-label: #9999aa;
+        --color-sidebar-card: #f0f0f5;
+        --color-sidebar-card-border: #e2e2ea;
+        --color-sidebar-badge-bg: #e2e2ea;
+        --color-sidebar-badge-text: #1a1a2e;
+        --color-sidebar-title: #1a1a2e;
+        --color-sidebar-subtitle: #6b6b85;
+        --color-sidebar-active-bg: #ffffff;
+        --color-sidebar-active-border: #f89820;
+        --color-sidebar-icon: #9999aa;
+        --color-sidebar-icon-hover: #1a1a2e;
+        --color-sidebar-tooltip-bg: #ffffff;
+        --color-sidebar-tooltip-border: #e2e2ea;
+        --color-sidebar-tooltip-text: #1a1a2e;
+        --color-topbar-bg: #ffffff;
+        --color-topbar-border: #e2e2ea;
+        --color-breadcrumb: #1a1a2e;
+        --color-breadcrumb-strong: #1a1a2e;
+        --color-pill-streak-bg: #fff3e0;
+        --color-pill-streak-border: #f89820;
+        --color-pill-streak-text: #f89820;
+        --color-pill-xp-bg: #e0faf6;
+        --color-pill-xp-border: #00d4b4;
+        --color-pill-xp-text: #00a896;
+        --color-hero-bg: linear-gradient(135deg, #fff8f0 0%, #f0faf8 100%);
+        --color-hero-border: #e2e2ea;
+        --color-hero-label: #9999aa;
+        --color-hero-title: #1a1a2e;
+        --color-hero-subtitle: #6b6b85;
+        --color-progress-track: #e2e2ea;
+        --color-progress-fill: #f89820;
+        --color-button-primary-bg: #f89820;
+        --color-button-primary-text: #0e0e12;
+        --color-button-primary-hover-bg: #e07a10;
+        --color-button-secondary-bg: #ffffff;
+        --color-button-secondary-border: #e2e2ea;
+        --color-button-secondary-text: #1a1a2e;
+        --color-button-secondary-hover-bg: #1a1a2e;
+        --color-button-secondary-hover-text: #ffffff;
+        --color-card-bg: #ffffff;
+        --color-card-border: #e2e2ea;
+        --color-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        --color-card-shadow-hover: 0 8px 22px rgba(0, 0, 0, 0.1);
+        --color-card-label: #9999aa;
+        --color-card-title: #1a1a2e;
+        --color-card-body: #4a4a6a;
+        --color-card-secondary: #9999aa;
+        --color-card-icon-bg: #f7f7fb;
+        --color-card-icon: #f89820;
+        --color-progress-completed: #00d4b4;
+        --color-progress-active: #f89820;
+        --color-progress-locked: #e2e2ea;
+        --color-progress-dot-completed: #00d4b4;
+        --color-progress-dot-active: #f89820;
+        --color-progress-dot-locked: #d0d0dc;
+        --color-review-empty-icon-bg: #e0faf6;
+        --color-review-empty-icon-stroke: #00d4b4;
+        --color-challenge-badge-bg: #fff3e0;
+        --color-challenge-badge-border: #f89820;
+        --color-challenge-badge-text: #f89820;
+        --color-map-bg: #f5f5fa;
+        --color-map-border: #e2e2ea;
+        --color-map-line: #d0d0dc;
+        --color-map-line-completed: #00d4b4;
+        --color-map-legend: #9999aa;
+        --color-map-node-name: #4a4a6a;
+        --color-map-node-completed-bg: #00d4b4;
+        --color-map-node-completed-text: #ffffff;
+        --color-map-node-active-bg: #f89820;
+        --color-map-node-active-text: #0e0e12;
+        --color-map-node-locked-bg: #e8e8f0;
+        --color-map-node-locked-border: #d0d0dc;
+        --color-map-node-locked-text: #9999aa;
+        --color-map-status-completed: #00a896;
+        --color-map-status-active: #e07a10;
+        --color-map-node-ring-1: rgba(248, 152, 32, 0.3);
+        --color-map-node-ring-2: rgba(248, 152, 32, 0);
+        --color-scrollbar-thumb: #d0d0dc;
+        --color-scrollbar-thumb-hover: #9999aa;
+        --color-scrollbar-track: transparent;
+      }
+
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
+        transition:
+          background-color var(--transition-fast),
+          color var(--transition-fast),
+          border-color var(--transition-fast),
+          box-shadow var(--transition-fast);
       }
 
       html,
@@ -44,11 +231,11 @@
         margin: 0;
         min-height: 100%;
         background:
-          radial-gradient(circle at top left, rgba(248, 152, 32, 0.08), transparent 24%),
-          radial-gradient(circle at bottom right, rgba(0, 212, 180, 0.08), transparent 22%),
-          var(--bg);
-        color: var(--text);
-        font-family: "Inter", sans-serif;
+          radial-gradient(circle at top left, var(--color-bg-glow-start), transparent 22%),
+          radial-gradient(circle at bottom right, var(--color-bg-glow-end), transparent 20%),
+          var(--color-bg);
+        color: var(--color-text);
+        font-family: var(--font-body);
       }
 
       body {
@@ -56,25 +243,46 @@
       }
 
       button {
+        border: 0;
         font: inherit;
         cursor: pointer;
+      }
+
+      svg {
+        display: block;
+      }
+
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: var(--color-scrollbar-track);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: var(--color-scrollbar-thumb);
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--color-scrollbar-thumb-hover);
       }
 
       .dashboard-shell {
         min-height: 100vh;
         display: grid;
-        grid-template-columns: 288px minmax(0, 1fr);
+        grid-template-columns: 280px minmax(0, 1fr);
       }
 
       .sidebar {
         position: sticky;
         top: 0;
         height: 100vh;
-        padding: 24px 18px 18px;
-        border-right: 1px solid var(--border);
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 24%),
-          rgba(14, 14, 18, 0.96);
+        padding: 22px 18px 18px;
+        border-right: 1px solid var(--color-sidebar-border);
+        background: var(--color-sidebar-bg);
         display: flex;
         flex-direction: column;
         gap: 18px;
@@ -84,7 +292,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        padding: 4px 6px 16px;
+        padding: 4px 2px 10px;
       }
 
       .brand-mark {
@@ -93,164 +301,188 @@
         border-radius: 12px;
         display: grid;
         place-items: center;
-        font-family: "JetBrains Mono", monospace;
+        background: var(--color-brand-soft);
+        color: var(--color-brand);
+        font-family: var(--font-heading);
+        font-size: 0.92rem;
         font-weight: 700;
-        color: var(--bg);
-        background: linear-gradient(135deg, var(--orange), #ffb54f);
       }
 
       .brand-copy small,
       .section-label {
         display: block;
+        color: var(--color-text-label);
         font-size: 11px;
-        letter-spacing: 0.1em;
+        font-weight: 500;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: var(--muted);
       }
 
       .brand-copy strong {
         display: block;
         margin-top: 4px;
-        font-family: "JetBrains Mono", monospace;
-        font-size: 20px;
-        color: var(--orange);
+        color: var(--color-brand);
+        font-family: var(--font-heading);
+        font-size: 1.12rem;
+        font-weight: 700;
       }
 
-      .user-card,
+      .profile-card,
       .level-card,
       .dashboard-card,
       .course-map {
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        background: var(--panel);
+        border: 1px solid var(--color-card-border);
+        border-radius: var(--radius-md);
+        background: var(--color-card-bg);
+        box-shadow: var(--color-card-shadow);
       }
 
-      .user-card {
+      .profile-card {
         display: flex;
         align-items: center;
         gap: 12px;
         padding: 14px;
+        background: var(--color-sidebar-card);
+        border-color: var(--color-sidebar-card-border);
+        box-shadow: none;
       }
 
       .avatar {
-        width: 44px;
-        height: 44px;
+        width: 46px;
+        height: 46px;
+        flex: 0 0 auto;
         border-radius: 14px;
         display: grid;
         place-items: center;
-        background: linear-gradient(135deg, rgba(248, 152, 32, 0.18), rgba(0, 212, 180, 0.18));
-        font-family: "JetBrains Mono", monospace;
+        background: linear-gradient(135deg, var(--color-brand-soft), var(--color-success-soft));
+        color: var(--color-text-strong);
+        font-family: var(--font-heading);
         font-weight: 700;
       }
 
-      .user-card strong {
+      .profile-copy {
+        min-width: 0;
+      }
+
+      .profile-copy strong {
         display: block;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
+        color: var(--color-sidebar-title);
+        line-height: 1.18;
       }
 
-      .user-card span {
-        color: var(--muted);
-        font-size: 13px;
+      .profile-copy span {
+        display: block;
+        color: var(--color-sidebar-subtitle);
+        font-size: 0.82rem;
       }
 
-      .level-list {
+      .sidebar-nav {
         display: flex;
         flex-direction: column;
         gap: 10px;
       }
 
-      .level-card.active {
-        border-left: 3px solid var(--orange);
-        background: var(--panel-alt);
+      .level-card {
+        overflow: hidden;
+        background: var(--color-sidebar-card);
+        border-color: var(--color-sidebar-card-border);
+        box-shadow: none;
+      }
+
+      .level-card[data-open="true"],
+      .level-card.is-active {
+        background: var(--color-sidebar-active-bg);
+      }
+
+      .level-card.is-active {
+        border-left: 3px solid var(--color-sidebar-active-border);
       }
 
       .level-toggle {
         width: 100%;
         padding: 14px 14px 14px 16px;
-        border: 0;
         background: transparent;
-        color: var(--text);
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto;
-        gap: 12px;
         align-items: center;
+        gap: 12px;
         text-align: left;
       }
 
-      .level-badge,
-      .xp-badge,
-      .status-chip,
-      .stat-pill {
+      .level-badge {
+        min-width: 42px;
+        height: 32px;
+        padding: 0 12px;
         border-radius: 999px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        background: var(--color-sidebar-badge-bg);
+        color: var(--color-sidebar-badge-text);
+        font-family: var(--font-heading);
+        font-size: 0.78rem;
+        font-weight: 700;
       }
 
-      .level-badge {
-        min-width: 40px;
-        height: 32px;
-        padding: 0 10px;
-        background: rgba(248, 152, 32, 0.12);
-        color: var(--orange);
-        font-family: "JetBrains Mono", monospace;
-        font-size: 13px;
-        font-weight: 700;
+      .level-copy {
+        min-width: 0;
       }
 
       .level-copy strong {
         display: block;
-        margin-bottom: 5px;
-        font-size: 15px;
+        color: var(--color-sidebar-title);
+        line-height: 1.18;
       }
 
-      .level-progress {
-        color: var(--muted);
-        font-size: 12px;
+      .level-copy span {
+        display: block;
+        margin-top: 5px;
+        color: var(--color-sidebar-subtitle);
+        font-size: 0.76rem;
       }
 
-      .chevron {
+      .level-chevron {
         width: 18px;
         height: 18px;
-        transition: transform 160ms ease;
+        color: var(--color-sidebar-title);
+        opacity: 0.82;
+        transform: rotate(0deg);
       }
 
-      .level-card[data-open="true"] .chevron {
+      .level-card[data-open="true"] .level-chevron {
         transform: rotate(180deg);
       }
 
       .level-body {
-        display: none;
+        display: grid;
+        gap: 8px;
         padding: 0 14px 14px 16px;
       }
 
-      .level-card[data-open="true"] .level-body {
-        display: block;
+      .level-card[data-open="false"] .level-body {
+        display: none;
       }
 
-      .level-mini-list {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        display: grid;
-        gap: 8px;
-      }
-
-      .level-mini-list li {
+      .mini-module {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
         padding: 10px 12px;
         border-radius: 10px;
-        background: rgba(255, 255, 255, 0.03);
-        color: var(--muted-soft);
-        font-size: 13px;
+        background: color-mix(in srgb, var(--color-card-bg) 86%, var(--color-text-secondary) 14%);
+        font-size: 0.8rem;
       }
 
-      .level-mini-list li strong {
-        color: var(--text);
+      .mini-module strong {
+        color: var(--color-text);
         font-weight: 500;
+      }
+
+      .mini-module span {
+        color: var(--color-text-secondary);
+        white-space: nowrap;
       }
 
       .sidebar-footer {
@@ -259,37 +491,41 @@
         gap: 10px;
       }
 
-      .icon-only {
+      .icon-button {
         position: relative;
-        width: 44px;
-        height: 44px;
-        border: 1px solid var(--border);
+        width: 42px;
+        height: 42px;
+        border: 1px solid var(--color-sidebar-card-border);
         border-radius: 12px;
-        background: var(--panel);
-        color: var(--muted-soft);
+        background: transparent;
+        color: var(--color-sidebar-icon);
         display: grid;
         place-items: center;
       }
 
-      .icon-only::after {
+      .icon-button:hover {
+        color: var(--color-sidebar-icon-hover);
+        background: var(--color-sidebar-active-bg);
+      }
+
+      .icon-button::after {
         content: attr(data-tooltip);
         position: absolute;
-        left: calc(100% + 10px);
+        left: calc(100% + 12px);
         top: 50%;
         transform: translateY(-50%);
         padding: 8px 10px;
+        border: 1px solid var(--color-sidebar-tooltip-border);
         border-radius: 10px;
-        background: #111118;
-        border: 1px solid var(--border);
-        color: var(--text);
-        font-size: 12px;
+        background: var(--color-sidebar-tooltip-bg);
+        color: var(--color-sidebar-tooltip-text);
+        font-size: 0.76rem;
         white-space: nowrap;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 160ms ease;
       }
 
-      .icon-only:hover::after {
+      .icon-button:hover::after {
         opacity: 1;
       }
 
@@ -305,8 +541,8 @@
         z-index: 10;
         min-height: 72px;
         padding: 18px 28px;
-        border-bottom: 1px solid var(--border);
-        background: rgba(14, 14, 18, 0.88);
+        border-bottom: 1px solid var(--color-topbar-border);
+        background: var(--color-topbar-bg);
         backdrop-filter: blur(14px);
         display: flex;
         align-items: center;
@@ -314,20 +550,68 @@
         gap: 18px;
       }
 
-      .breadcrumb {
+      .topbar-left {
         display: flex;
         align-items: center;
+        gap: 14px;
+        min-width: 0;
+      }
+
+      .breadcrumb {
+        display: inline-flex;
+        align-items: center;
         gap: 10px;
-        color: var(--muted-soft);
-        font-size: 14px;
+        min-width: 0;
+        color: var(--color-breadcrumb);
+        font-size: 0.95rem;
       }
 
       .breadcrumb strong {
-        color: var(--text);
+        color: var(--color-breadcrumb-strong);
+        font-weight: 600;
       }
 
-      .topbar-stats {
+      .breadcrumb-separator {
+        color: var(--color-text-secondary);
+        font-size: 0.95rem;
+      }
+
+      .theme-toggle {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 auto;
+        border: 1px solid var(--color-card-border);
+        border-radius: 10px;
+        background: var(--color-card-bg);
+        color: var(--color-text-secondary);
+        display: grid;
+        place-items: center;
+      }
+
+      .theme-toggle:hover {
+        color: var(--color-text);
+      }
+
+      .theme-toggle svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .theme-toggle .icon-sun {
+        display: none;
+      }
+
+      :root[data-theme="light"] .theme-toggle .icon-sun {
+        display: block;
+      }
+
+      :root[data-theme="light"] .theme-toggle .icon-moon {
+        display: none;
+      }
+
+      .topbar-right {
         display: flex;
+        align-items: center;
         gap: 12px;
         flex-wrap: wrap;
       }
@@ -335,15 +619,29 @@
       .stat-pill {
         min-height: 40px;
         padding: 0 14px;
-        border: 1px solid var(--border);
-        background: var(--panel);
+        border-radius: 999px;
+        border: 1px solid;
+        display: inline-flex;
+        align-items: center;
         gap: 10px;
-        font-size: 15px;
+        font-size: 0.96rem;
         font-weight: 600;
       }
 
-      .content {
-        padding: 24px 28px 30px;
+      .stat-pill.streak {
+        background: var(--color-pill-streak-bg);
+        border-color: var(--color-pill-streak-border);
+        color: var(--color-pill-streak-text);
+      }
+
+      .stat-pill.xp {
+        background: var(--color-pill-xp-bg);
+        border-color: var(--color-pill-xp-border);
+        color: var(--color-pill-xp-text);
+      }
+
+      .workspace {
+        padding: 24px 28px 32px;
         display: grid;
         gap: 24px;
       }
@@ -352,81 +650,1020 @@
         position: relative;
         min-height: 80px;
         padding: 18px 20px 16px;
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        background:
-          linear-gradient(110deg, rgba(255, 255, 255, 0.03), transparent 34%),
-          linear-gradient(120deg, #16161e, #1b1b27 60%, rgba(248, 152, 32, 0.08));
-        box-shadow: var(--shadow);
+        border: 1px solid var(--color-hero-border);
+        border-radius: var(--radius-md);
+        background: var(--color-hero-bg);
+        box-shadow: var(--color-card-shadow);
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 18px;
         align-items: center;
+        gap: 18px;
         overflow: hidden;
       }
 
       .hero-copy h1 {
         margin: 6px 0 4px;
-        font-family: "JetBrains Mono", monospace;
-        font-size: 24px;
+        color: var(--color-hero-title);
+        font-family: var(--font-heading);
+        font-size: 1.35rem;
+        line-height: 1.18;
       }
 
-      .hero-copy p,
-      .card-title p,
-      .course-map-title p,
-      .empty-state p,
-      .challenge-extra p {
+      .hero-copy p {
         margin: 0;
-        color: var(--muted);
+        color: var(--color-hero-subtitle);
+        font-size: 0.9rem;
       }
 
-      .primary-cta,
-      .secondary-cta {
+      .primary-button,
+      .secondary-button {
         min-height: 44px;
         padding: 0 18px;
         border-radius: 12px;
-        font-weight: 700;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 10px;
+        font-weight: 700;
       }
 
-      .primary-cta {
-        border: 0;
-        background: linear-gradient(135deg, var(--orange), #ffb14c);
-        color: #0e0e12;
+      .primary-button {
+        background: var(--color-button-primary-bg);
+        color: var(--color-button-primary-text);
       }
 
-      .secondary-cta {
-        border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--text);
+      .primary-button:hover {
+        background: var(--color-button-primary-hover-bg);
       }
 
-      .cta-arrow {
-        transition: transform 160ms ease;
+      .secondary-button {
+        border: 1px solid var(--color-button-secondary-border);
+        background: var(--color-button-secondary-bg);
+        color: var(--color-button-secondary-text);
       }
 
-      .primary-cta:hover .cta-arrow {
+      .secondary-button:hover {
+        background: var(--color-button-secondary-hover-bg);
+        color: var(--color-button-secondary-hover-text);
+      }
+
+      .button-arrow {
+        transition: transform var(--transition-fast);
+      }
+
+      .primary-button:hover .button-arrow {
         transform: translateX(4px);
       }
 
       .hero-progress {
         position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        inset: auto 0 0;
         height: 3px;
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--color-progress-track);
       }
 
-      .hero-progress span {
+      .hero-progress > span {
         display: block;
         width: 16%;
         height: 100%;
-        background: linear-gradient(90deg, var(--orange), var(--teal));
+        background: var(--color-progress-fill);
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .dashboard-card {
+        min-height: 252px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .dashboard-card:hover,
+      .course-map:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--color-card-shadow-hover);
+      }
+
+      .card-header,
+      .course-map-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .card-title {
+        min-width: 0;
+        display: grid;
+        gap: 6px;
+      }
+
+      .card-title h2,
+      .course-map-title h2 {
+        margin: 0;
+        color: var(--color-card-title);
+        font-family: var(--font-heading);
+        font-size: 1.08rem;
+        line-height: 1.14;
+      }
+
+      .card-title p,
+      .course-map-title p,
+      .card-copy,
+      .challenge-details {
+        margin: 0;
+        color: var(--color-card-body);
+        line-height: 1.5;
+      }
+
+      .card-title .subtle-copy,
+      .course-map-title .subtle-copy {
+        color: var(--color-card-secondary);
+      }
+
+      .card-icon {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: var(--color-card-icon-bg);
+        color: var(--color-card-icon);
+      }
+
+      .segmented-progress {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .progress-segment {
+        height: 14px;
+        border-radius: 999px;
+        background: var(--color-progress-locked);
+      }
+
+      .progress-segment.is-completed {
+        background: var(--color-progress-completed);
+      }
+
+      .progress-segment.is-active {
+        background: var(--color-progress-active);
+      }
+
+      .legend-row,
+      .course-map-legend {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        color: var(--color-card-secondary);
+        font-size: 0.78rem;
+      }
+
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .legend-dot.is-completed {
+        background: var(--color-progress-dot-completed);
+      }
+
+      .legend-dot.is-active {
+        background: var(--color-progress-dot-active);
+      }
+
+      .legend-dot.is-locked {
+        background: var(--color-progress-dot-locked);
+      }
+
+      .card-footer-copy {
+        margin-top: auto;
+        display: grid;
+        gap: 8px;
+      }
+
+      .card-footer-copy strong {
+        color: var(--color-card-title);
+        line-height: 1.2;
+      }
+
+      .card-footer-copy p {
+        max-width: 34ch;
+      }
+
+      .empty-state {
+        margin: auto 0;
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+        text-align: center;
+      }
+
+      .empty-state-icon {
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--color-review-empty-icon-bg);
+        color: var(--color-review-empty-icon-stroke);
+      }
+
+      .empty-state-icon svg {
+        width: 54px;
+        height: 54px;
+      }
+
+      .empty-state strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--color-card-title);
+        font-size: 0.98rem;
+      }
+
+      .challenge-panel {
+        min-height: 100%;
+        padding: 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--color-card-border);
+        background: color-mix(in srgb, var(--color-card-bg) 90%, var(--color-text-secondary) 10%);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .challenge-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .challenge-top strong {
+        color: var(--color-card-title);
+        line-height: 1.35;
+      }
+
+      .challenge-xp {
+        min-height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--color-challenge-badge-border);
+        border-radius: 999px;
+        background: var(--color-challenge-badge-bg);
+        color: var(--color-challenge-badge-text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .challenge-cta {
+        align-self: flex-start;
+      }
+
+      .challenge-toggle {
+        align-self: flex-start;
+        padding: 0;
+        background: transparent;
+        color: var(--color-card-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+
+      .challenge-toggle svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .challenge-card[data-expanded="true"] .challenge-toggle svg {
+        transform: rotate(180deg);
+      }
+
+      .challenge-details {
+        display: none;
+        font-size: 0.84rem;
+      }
+
+      .challenge-card[data-expanded="true"] .challenge-details {
+        display: block;
+      }
+
+      .course-map {
+        padding: 20px 20px 22px;
+        background: var(--color-map-bg);
+        border-color: var(--color-map-border);
+      }
+
+      .course-map-title {
+        display: grid;
+        gap: 6px;
+      }
+
+      .course-map-head {
+        margin-bottom: 24px;
+      }
+
+      .course-map-legend {
+        margin-top: 6px;
+        color: var(--color-map-legend);
+      }
+
+      .map-track {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(74px, 1fr));
+        gap: 18px;
+        align-items: start;
+      }
+
+      .map-node {
+        position: relative;
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .map-node::after {
+        content: "";
+        position: absolute;
+        top: 28px;
+        left: calc(50% + 34px);
+        width: calc(100% + 18px - 68px);
+        height: 1px;
+        background: var(--color-map-line);
+      }
+
+      .map-node:last-child::after {
+        display: none;
+      }
+
+      .map-node.is-completed::after {
+        background: var(--color-map-line-completed);
+      }
+
+      .map-node-core {
+        position: relative;
+        width: 56px;
+        height: 56px;
+        border: 1px solid transparent;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+      }
+
+      .map-node.is-completed .map-node-core {
+        background: var(--color-map-node-completed-bg);
+        color: var(--color-map-node-completed-text);
+      }
+
+      .map-node.is-active .map-node-core {
+        background: var(--color-map-node-active-bg);
+        color: var(--color-map-node-active-text);
+        animation: node-pulse 2s ease-out infinite;
+      }
+
+      .map-node.is-locked .map-node-core {
+        border-color: var(--color-map-node-locked-border);
+        background: var(--color-map-node-locked-bg);
+        color: var(--color-map-node-locked-text);
+      }
+
+      .map-node-number {
+        font-family: var(--font-heading);
+        font-size: 0.98rem;
+        font-weight: 700;
+      }
+
+      .map-node-copy {
+        min-width: 0;
+        text-align: center;
+        display: grid;
+        gap: 4px;
+      }
+
+      .map-node-copy strong {
+        color: var(--color-map-node-name);
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.35;
+      }
+
+      .map-status {
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.3;
+      }
+
+      .map-status.is-completed {
+        color: var(--color-map-status-completed);
+      }
+
+      .map-status.is-active {
+        color: var(--color-map-status-active);
+      }
+
+      @keyframes node-pulse {
+        0% {
+          box-shadow: 0 0 0 0 var(--color-map-node-ring-1);
+        }
+        70% {
+          box-shadow: 0 0 0 14px var(--color-map-node-ring-2);
+        }
+        100% {
+          box-shadow: 0 0 0 0 var(--color-map-node-ring-2);
+        }
+      }
+
+      @media (max-width: 1400px) {
+        .map-track {
+          grid-template-columns: repeat(6, minmax(84px, 1fr));
+          row-gap: 26px;
+        }
+
+        .map-node:nth-child(6n)::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 1100px) {
+        .dashboard-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+          height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--color-sidebar-border);
+        }
+
+        .dashboard-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .topbar,
+        .hero-strip,
+        .course-map-head {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .topbar {
+          padding-inline: 18px;
+        }
+
+        .hero-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .workspace {
+          padding-inline: 18px;
+        }
+
+        .map-track {
+          grid-template-columns: repeat(3, minmax(84px, 1fr));
+        }
+
+        .map-node:nth-child(3n)::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .workspace {
+          padding-inline: 16px;
+        }
+
+        .hero-strip,
+        .dashboard-card,
+        .course-map {
+          padding-inline: 16px;
+        }
+
+        .map-track {
+          grid-template-columns: repeat(2, minmax(90px, 1fr));
+        }
+
+        .map-node:nth-child(2n)::after {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
       }
     </style>
   </head>
-  <body></body>
+  <body>
+    <div class="dashboard-shell">
+      <aside class="sidebar" aria-label="Nawigacja kursu">
+        <div class="brand">
+          <div class="brand-mark">JP</div>
+          <div class="brand-copy">
+            <small>Java Learning Path</small>
+            <strong>JavaPath</strong>
+          </div>
+        </div>
+
+        <section class="profile-card" aria-label="Profil kursanta">
+          <div class="avatar">JP</div>
+          <div class="profile-copy">
+            <strong>Jan Pathowski</strong>
+            <span>Poziom 3 · Kursant</span>
+          </div>
+        </section>
+
+        <span class="section-label">Program kursu</span>
+
+        <nav class="sidebar-nav" aria-label="Poziomy kursu">
+          <section class="level-card is-active" data-open="true">
+            <button class="level-toggle" type="button" data-level-toggle aria-expanded="true">
+              <span class="level-badge">P1</span>
+              <span class="level-copy">
+                <strong>Fundamenty</strong>
+                <span>3/10 lekcji</span>
+              </span>
+              <svg class="level-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <div class="level-body">
+              <div class="mini-module">
+                <strong>Hello, World!</strong>
+                <span>Ukończono</span>
+              </div>
+              <div class="mini-module">
+                <strong>Zmienne</strong>
+                <span>W toku</span>
+              </div>
+              <div class="mini-module">
+                <strong>Typy danych</strong>
+                <span>Zablokowane</span>
+              </div>
+            </div>
+          </section>
+          <section class="level-card" data-open="false">
+            <button class="level-toggle" type="button" data-level-toggle aria-expanded="false">
+              <span class="level-badge">P2</span>
+              <span class="level-copy">
+                <strong>Logika i sterowanie</strong>
+                <span>0/9 lekcji</span>
+              </span>
+              <svg class="level-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <div class="level-body">
+              <div class="mini-module">
+                <strong>Instrukcja if/else</strong>
+                <span>Wymaga P1</span>
+              </div>
+              <div class="mini-module">
+                <strong>Pętla for</strong>
+                <span>Wymaga P1</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="level-card" data-open="false">
+            <button class="level-toggle" type="button" data-level-toggle aria-expanded="false">
+              <span class="level-badge">P3</span>
+              <span class="level-copy">
+                <strong>Struktura kodu</strong>
+                <span>0/8 lekcji</span>
+              </span>
+              <svg class="level-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <div class="level-body">
+              <div class="mini-module">
+                <strong>Metody</strong>
+                <span>Wymaga P2</span>
+              </div>
+              <div class="mini-module">
+                <strong>Scope</strong>
+                <span>Wymaga P2</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="level-card" data-open="false">
+            <button class="level-toggle" type="button" data-level-toggle aria-expanded="false">
+              <span class="level-badge">P4</span>
+              <span class="level-copy">
+                <strong>OOP i dalej</strong>
+                <span>0/14 lekcji</span>
+              </span>
+              <svg class="level-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <div class="level-body">
+              <div class="mini-module">
+                <strong>Klasy i obiekty</strong>
+                <span>Wymaga P3</span>
+              </div>
+              <div class="mini-module">
+                <strong>ArrayList</strong>
+                <span>Wymaga P3</span>
+              </div>
+            </div>
+          </section>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="icon-button" type="button" data-tooltip="Ustawienia" aria-label="Ustawienia">
+            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+              <path d="M8.7 2.5H11.3L11.8 4.53C12.26 4.68 12.69 4.86 13.1 5.09L14.98 4.1L16.9 6.02L15.91 7.9C16.14 8.31 16.32 8.74 16.47 9.2L18.5 9.7V12.3L16.47 12.8C16.32 13.26 16.14 13.69 15.91 14.1L16.9 15.98L14.98 17.9L13.1 16.91C12.69 17.14 12.26 17.32 11.8 17.47L11.3 19.5H8.7L8.2 17.47C7.74 17.32 7.31 17.14 6.9 16.91L5.02 17.9L3.1 15.98L4.09 14.1C3.86 13.69 3.68 13.26 3.53 12.8L1.5 12.3V9.7L3.53 9.2C3.68 8.74 3.86 8.31 4.09 7.9L3.1 6.02L5.02 4.1L6.9 5.09C7.31 4.86 7.74 4.68 8.2 4.53L8.7 2.5Z" stroke="currentColor" stroke-width="1.3" />
+              <circle cx="10" cy="10" r="2.8" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <button class="icon-button" type="button" data-tooltip="Wyloguj" aria-label="Wyloguj">
+            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+              <path d="M12.5 3.5H5.9C5.02 3.5 4.3 4.22 4.3 5.1V14.9C4.3 15.78 5.02 16.5 5.9 16.5H12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              <path d="M11 10H18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              <path d="M15.2 7L18.2 10L15.2 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="topbar-left">
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+              <span>Dashboard</span>
+              <span class="breadcrumb-separator">›</span>
+              <strong>Twój postęp</strong>
+            </nav>
+
+            <button class="theme-toggle" type="button" aria-label="Przełącz motyw" id="theme-toggle">
+              <svg class="icon-moon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M12.8 2.6C10.15 3.16 8.16 5.52 8.16 8.35C8.16 11.61 10.8 14.25 14.06 14.25C15.2 14.25 16.27 13.93 17.18 13.37C16.26 15.67 14.01 17.3 11.38 17.3C7.93 17.3 5.13 14.5 5.13 11.05C5.13 7.91 7.45 5.31 10.47 4.88C11.27 3.96 11.98 3.22 12.8 2.6Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <svg class="icon-sun" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="3.4" stroke="currentColor" stroke-width="1.5" />
+                <path d="M10 2.2V4.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M10 15.8V17.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M17.8 10H15.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M4.2 10H2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M15.52 4.48L14.1 5.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M5.9 14.1L4.48 15.52" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M15.52 15.52L14.1 14.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M5.9 5.9L4.48 4.48" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="topbar-right">
+            <div class="stat-pill streak">
+              <svg viewBox="0 0 20 20" fill="none" width="16" height="16" aria-hidden="true">
+                <path d="M10.13 1.9C11.55 4.06 12.04 5.65 11.46 7.1C13.14 6.54 14.17 5.2 14.52 3.72C16.6 5.53 17.74 7.84 17.74 10.25C17.74 14.26 14.5 17.5 10.49 17.5C6.48 17.5 3.24 14.26 3.24 10.25C3.24 7.13 5.04 4.43 8.08 2.62C8.08 4.13 8.59 5.56 9.54 6.55C10.25 5.22 10.45 3.66 10.13 1.9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>🔥 1 dzień</span>
+            </div>
+            <div class="stat-pill xp">
+              <svg viewBox="0 0 20 20" fill="none" width="16" height="16" aria-hidden="true">
+                <path d="M11.36 1.9L4.95 10.34H9.24L8.51 18.1L14.92 9.66H10.63L11.36 1.9Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+              </svg>
+              <span>⚡ 240 XP</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="workspace">
+          <section class="hero-strip">
+            <div class="hero-copy">
+              <span class="section-label">Dark IDE meets learning game</span>
+              <h1>Witaj ponownie, Jan. Czas wrócić do kodu.</h1>
+              <p>Aktywny moduł: Zmienne · Jeden krok dzieli Cię od odblokowania kolejnej lekcji.</p>
+            </div>
+
+            <button class="primary-button" type="button">
+              Rozpocznij pierwszą lekcję
+              <span class="button-arrow" aria-hidden="true">→</span>
+            </button>
+
+            <div class="hero-progress" aria-label="Postęp całego kursu">
+              <span></span>
+            </div>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="dashboard-card">
+              <header class="card-header">
+                <div class="card-title">
+                  <span class="section-label">Twój postęp</span>
+                  <h2>Postęp kursu</h2>
+                  <p class="subtle-copy">Następny moduł: Twój pierwszy program</p>
+                </div>
+                <div class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                    <path d="M4 15.5H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    <path d="M5.5 12.4L8.6 9.3L11.2 11.8L14.8 8.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+              </header>
+
+              <div class="segmented-progress" aria-label="Segmentowany postęp modułów">
+                <span class="progress-segment is-completed"></span>
+                <span class="progress-segment is-active"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+                <span class="progress-segment"></span>
+              </div>
+
+              <div class="legend-row">
+                <span class="legend-item"><span class="legend-dot is-completed"></span>Ukończony</span>
+                <span class="legend-item"><span class="legend-dot is-active"></span>W toku</span>
+                <span class="legend-item"><span class="legend-dot is-locked"></span>Zablokowany</span>
+              </div>
+
+              <div class="card-footer-copy">
+                <strong>1 z 12 modułów ukończonych</strong>
+                <p>Aktywny poziom jest od razu gotowy do kontynuacji, a kolejne moduły odblokują się po ukończeniu bieżącego kroku.</p>
+              </div>
+            </article>
+
+            <article class="dashboard-card">
+              <header class="card-header">
+                <div class="card-title">
+                  <span class="section-label">Dziś do powtórek</span>
+                  <h2>Kolejka powtórek</h2>
+                  <p class="subtle-copy">Spaced repetition uruchomi się po pierwszym module</p>
+                </div>
+                <div class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                    <path d="M5 3.8V6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                    <path d="M15 3.8V6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                    <rect x="3.5" y="5.3" width="13" height="11.2" rx="2.3" stroke="currentColor" stroke-width="1.4" />
+                    <path d="M3.5 8.5H16.5" stroke="currentColor" stroke-width="1.4" />
+                  </svg>
+                </div>
+              </header>
+
+              <div class="empty-state">
+                <div class="empty-state-icon" aria-hidden="true">
+                  <svg viewBox="0 0 48 48" fill="none">
+                    <rect x="10" y="11" width="28" height="24" rx="6" stroke="currentColor" stroke-width="2" />
+                    <path d="M16 8V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <path d="M32 8V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <path d="M10 18H38" stroke="currentColor" stroke-width="2" />
+                    <path d="M19.5 26L23 29.5L29.5 23" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div>
+                  <strong>Ukończ pierwszy moduł aby odblokować powtórki</strong>
+                  <p>JavaPath zacznie planować krótkie odświeżki zaraz po pierwszym pełnym sukcesie.</p>
+                </div>
+                <button class="secondary-button" type="button">Przejdź do pierwszej lekcji</button>
+              </div>
+            </article>
+            <article class="dashboard-card challenge-card" data-expanded="false">
+              <header class="card-header">
+                <div class="card-title">
+                  <span class="section-label">Wyzwanie dnia</span>
+                  <h2>Krótki challenge</h2>
+                  <p class="subtle-copy">Jedno zadanie, szybka walidacja, bonus XP</p>
+                </div>
+                <div class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                    <path d="M6 3.5H14V5.5C14 6.88 15.12 8 16.5 8H17V9.2C17 13.18 13.82 16.5 9.84 16.5H10.16C6.18 16.5 3 13.18 3 9.2V8H3.5C4.88 8 6 6.88 6 5.5V3.5Z" stroke="currentColor" stroke-width="1.4" />
+                    <path d="M7.2 16.3V18H12.8V16.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                  </svg>
+                </div>
+              </header>
+
+              <div class="challenge-panel">
+                <div class="challenge-top">
+                  <strong>Wypisz poprawny komunikat dla użytkownika</strong>
+                  <span class="challenge-xp">40 XP</span>
+                </div>
+
+                <button class="primary-button challenge-cta" type="button">
+                  Otwórz wyzwanie
+                  <span class="button-arrow" aria-hidden="true">→</span>
+                </button>
+
+                <button class="challenge-toggle" type="button" aria-expanded="false" data-challenge-toggle>
+                  <span data-challenge-toggle-label>Pokaż szczegóły</span>
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+
+                <p class="challenge-details">
+                  Zadanie sprawdza poprawny output, składnię `System.out.println()` i czytelny komunikat dla użytkownika końcowego.
+                </p>
+              </div>
+            </article>
+          </section>
+
+          <section class="course-map">
+            <div class="course-map-head">
+              <div class="course-map-title">
+                <span class="section-label">Mapa kursu</span>
+                <h2>Wizualna ścieżka nauki</h2>
+                <p class="subtle-copy">Od pierwszego programu aż do końca Fundamentów, krok po kroku.</p>
+                <div class="course-map-legend">
+                  <span class="legend-item"><span class="legend-dot is-completed"></span>Ukończony</span>
+                  <span class="legend-item"><span class="legend-dot is-active"></span>Aktywny</span>
+                  <span class="legend-item"><span class="legend-dot is-locked"></span>Zablokowany</span>
+                </div>
+              </div>
+              <button class="secondary-button" type="button">Otwórz aktywny moduł</button>
+            </div>
+
+            <div class="map-track" aria-label="Mapa modułów">
+              <div class="map-node is-completed">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="22" height="22">
+                    <path d="M4.5 10.3L8.3 14.1L15.5 6.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy">
+                  <strong>Twój pierwszy program</strong>
+                  <span class="map-status is-completed">Ukończony</span>
+                </div>
+              </div>
+              <div class="map-node is-active">
+                <div class="map-node-core" aria-hidden="true">
+                  <span class="map-node-number">2</span>
+                </div>
+                <div class="map-node-copy">
+                  <strong>Zmienne</strong>
+                  <span class="map-status is-active">W toku</span>
+                </div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Typy danych</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Operatory</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Porównania</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Scanner</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Konwersja</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Stałe</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Ćwiczenia</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Projekt BMI</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Powtórka P1</strong></div>
+              </div>
+              <div class="map-node is-locked">
+                <div class="map-node-core" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="20" height="20">
+                    <rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.1" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M6.8 8.8V6.8C6.8 5 8.2 3.6 10 3.6C11.8 3.6 13.2 5 13.2 6.8V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="map-node-copy"><strong>Koniec poziomu</strong></div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const themeToggle = document.getElementById("theme-toggle");
+      const storedTheme = window.localStorage.getItem("javapath-theme");
+      const preferredTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+
+      function setTheme(theme) {
+        root.setAttribute("data-theme", theme);
+        window.localStorage.setItem("javapath-theme", theme);
+      }
+
+      setTheme(storedTheme || preferredTheme);
+
+      themeToggle.addEventListener("click", () => {
+        const nextTheme = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+        setTheme(nextTheme);
+      });
+
+      document.querySelectorAll("[data-level-toggle]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const card = button.closest(".level-card");
+          const nextState = card.getAttribute("data-open") !== "true";
+          card.setAttribute("data-open", String(nextState));
+          button.setAttribute("aria-expanded", String(nextState));
+        });
+      });
+
+      const challengeCard = document.querySelector(".challenge-card");
+      const challengeToggle = challengeCard.querySelector("[data-challenge-toggle]");
+      const challengeToggleLabel = challengeCard.querySelector("[data-challenge-toggle-label]");
+
+      challengeToggle.addEventListener("click", () => {
+        const expanded = challengeCard.getAttribute("data-expanded") === "true";
+        challengeCard.setAttribute("data-expanded", String(!expanded));
+        challengeToggle.setAttribute("aria-expanded", String(!expanded));
+        challengeToggleLabel.textContent = expanded ? "Pokaż szczegóły" : "Ukryj szczegóły";
+      });
+    </script>
+  </body>
 </html>

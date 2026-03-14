@@ -1,7 +1,10 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { java } from '@codemirror/lang-java'
+import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { EditorView } from '@codemirror/view'
+import { tags } from '@lezer/highlight'
 import {
   BookOpen,
   CheckCircle2,
@@ -14,7 +17,8 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react'
-import { lesson, type PracticeTask } from './courseData'
+import { type LessonData, type PracticeTask } from './courseData'
+import { executeJava } from './javaRunnerClient'
 
 type LessonPanel = 'lesson' | 'code'
 type OutputTone = 'neutral' | 'success' | 'error'
@@ -27,6 +31,8 @@ type TaskEvaluation = {
 }
 
 type LessonSessionProps = {
+  theme: 'light' | 'dark'
+  lesson: LessonData
   lessonComplete: boolean
   onAwardXp: (xp: number) => void
   onLessonCompleted: (xpReward: number) => void
@@ -36,6 +42,8 @@ type LessonSessionProps = {
 }
 
 export function LessonSession({
+  theme,
+  lesson,
   lessonComplete,
   onAwardXp,
   onLessonCompleted,
@@ -60,7 +68,6 @@ export function LessonSession({
   )
   const [exampleRunning, setExampleRunning] = useState(false)
   const [editorFullscreen, setEditorFullscreen] = useState(false)
-  const runTimerRef = useRef<number | null>(null)
   const exampleTimerRef = useRef<number | null>(null)
   const deferredPracticeCode = useDeferredValue(practiceCode)
 
@@ -70,14 +77,8 @@ export function LessonSession({
   const currentHintLevel = hintUsage[currentTask.id] ?? 0
   const currentHints = currentTask.hints.slice(0, currentHintLevel)
   const currentTaskReward = getTaskReward(currentTask, currentHintLevel)
-  const liveTaskCheck = evaluatePracticeTask(currentTask, deferredPracticeCode)
-
-  const clearRunTimer = () => {
-    if (runTimerRef.current !== null) {
-      window.clearTimeout(runTimerRef.current)
-      runTimerRef.current = null
-    }
-  }
+  const liveTaskCheck = evaluatePracticeDraft(currentTask, deferredPracticeCode)
+  const editorTheme = theme === 'light' ? javaPathLightTheme : oneDark
 
   const clearExampleTimer = () => {
     if (exampleTimerRef.current !== null) {
@@ -87,7 +88,6 @@ export function LessonSession({
   }
 
   const resetPracticeTask = (taskIndex: number) => {
-    clearRunTimer()
     const task = lesson.practice.tasks[taskIndex]
     setPracticeTaskIndex(taskIndex)
     setPracticeCode(task.starterCode)
@@ -108,41 +108,72 @@ export function LessonSession({
     }))
   }
 
-  const runPractice = (mode: RunMode) => {
-    clearRunTimer()
+  const runPractice = async (mode: RunMode) => {
     setPracticeRunMode(mode)
     setPracticeOutput(mode === 'run' ? 'Uruchamianie programu...' : 'Sprawdzanie rozwiazania...')
     setPracticeOutputTone('neutral')
 
-    runTimerRef.current = window.setTimeout(() => {
-      const result = evaluatePracticeTask(currentTask, practiceCode)
+    const draftResult = evaluatePracticeDraft(currentTask, practiceCode)
+
+    if (!draftResult.success) {
       setPracticeRunMode(null)
+      setPracticeOutput(draftResult.message)
+      setPracticeOutputTone('error')
+      return
+    }
 
-      if (result.success) {
-        setPracticeOutput(result.output ?? currentTask.expectedOutput)
-        setPracticeOutputTone('success')
+    const execution = await executeJava(practiceCode, currentTask.stdin ?? '')
+    setPracticeRunMode(null)
 
-        if (mode === 'check' && !completedTaskIds.includes(currentTask.id)) {
-          setCompletedTaskIds((current) => [...current, currentTask.id])
-          if (!lessonComplete) {
-            onAwardXp(currentTaskReward)
-          }
-          onShowToast(`Zadanie zaliczone. Otrzymujesz ${currentTaskReward} XP.`, 'success')
+    if (!execution.ok) {
+      setPracticeOutput(formatExecutionError(execution))
+      setPracticeOutputTone('error')
+      return
+    }
+
+    const runtimeOutput = normalizeRuntimeOutput(execution.stdout)
+
+    if (mode === 'run') {
+      setPracticeOutput(runtimeOutput || '(brak outputu)')
+      setPracticeOutputTone('success')
+      return
+    }
+
+    const result = evaluatePracticeTask(currentTask, practiceCode, runtimeOutput)
+
+    if (result.success) {
+      setPracticeOutput(result.output ?? currentTask.expectedOutput)
+      setPracticeOutputTone('success')
+
+      if (!completedTaskIds.includes(currentTask.id)) {
+        setCompletedTaskIds((current) => [...current, currentTask.id])
+        if (!lessonComplete) {
+          onAwardXp(currentTaskReward)
         }
-
-        return
+        onShowToast(`Zadanie zaliczone. Otrzymujesz ${currentTaskReward} XP.`, 'success')
       }
 
-      setPracticeOutput(result.message)
-      setPracticeOutputTone('error')
-    }, 700)
+      return
+    }
+
+    setPracticeOutput(result.message)
+    setPracticeOutputTone('error')
   }
 
-  const runExample = () => {
+  const runExample = async () => {
     clearExampleTimer()
     setExampleRunning(true)
+    setExampleOutput('Kompilowanie przykladu...')
+    const execution = await executeJava(selectedExample.code, selectedExample.stdin ?? '')
+
+    if (!execution.ok) {
+      setExampleRunning(false)
+      setExampleOutput(formatExecutionError(execution))
+      return
+    }
+
     setExampleOutput('')
-    const fullOutput = selectedExample.output
+    const fullOutput = normalizeRuntimeOutput(execution.stdout) || '(brak outputu)'
     let visibleLength = 0
 
     exampleTimerRef.current = window.setInterval(() => {
@@ -245,7 +276,6 @@ export function LessonSession({
 
   useEffect(() => {
     return () => {
-      clearRunTimer()
       clearExampleTimer()
     }
   }, [])
@@ -522,7 +552,7 @@ export function LessonSession({
             <div className="editor-toolbar-actions">
               {stepIndex === 3 && (
                 <span className={`live-indicator ${liveTaskCheck.success ? 'success' : 'neutral'}`}>
-                  {liveTaskCheck.success ? 'Gotowe do zaliczenia' : 'Kod w trakcie pracy'}
+                  {liveTaskCheck.success ? 'Wstepna analiza OK' : 'Szkic wymaga poprawki'}
                 </span>
               )}
               <button type="button" className="icon-button" aria-label="Reset" onClick={resetCurrentTask}>
@@ -583,7 +613,7 @@ export function LessonSession({
                   height="100%"
                   editable={false}
                   extensions={[java()]}
-                  theme={oneDark}
+                  theme={editorTheme}
                   basicSetup={{
                     lineNumbers: true,
                     foldGutter: false,
@@ -628,7 +658,7 @@ export function LessonSession({
                   value={practiceCode}
                   height="100%"
                   extensions={[java()]}
-                  theme={oneDark}
+                  theme={editorTheme}
                   onChange={(value) => setPracticeCode(value)}
                   basicSetup={{
                     lineNumbers: true,
@@ -640,7 +670,7 @@ export function LessonSession({
               </div>
 
               <div className="editor-status">
-                <span>Live check: {liveTaskCheck.message}</span>
+                <span>Wstepna analiza: {liveTaskCheck.message}</span>
                 <span>{deferredPracticeCode.split('\n').length} linii</span>
               </div>
 
@@ -724,9 +754,105 @@ export function LessonSession({
   )
 }
 
+const javaPathLightTheme = [
+  EditorView.theme({
+    '&': {
+      color: '#1a1a2e',
+      backgroundColor: '#ffffff',
+    },
+    '.cm-content': {
+      caretColor: '#f89820',
+    },
+    '.cm-scroller': {
+      fontFamily: '"Fira Code", monospace',
+    },
+    '&.cm-focused .cm-cursor': {
+      borderLeftColor: '#f89820',
+    },
+    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
+      backgroundColor: 'rgba(248, 152, 32, 0.18)',
+    },
+    '.cm-gutters': {
+      backgroundColor: '#f8f8fc',
+      color: '#9999aa',
+      border: 'none',
+      borderRight: '1px solid #e2e2ea',
+    },
+    '.cm-activeLine': {
+      backgroundColor: '#fff8f0',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: '#fff3e0',
+      color: '#1a1a2e',
+    },
+    '.cm-lineNumbers .cm-gutterElement': {
+      padding: '0 10px 0 6px',
+    },
+  }),
+  syntaxHighlighting(
+    HighlightStyle.define([
+      {
+        tag: [tags.keyword, tags.modifier, tags.operatorKeyword, tags.definitionKeyword],
+        color: '#d46a00',
+        fontWeight: '600',
+      },
+      {
+        tag: [tags.typeName, tags.className],
+        color: '#6f42c1',
+      },
+      {
+        tag: [tags.string],
+        color: '#0a7f66',
+      },
+      {
+        tag: [tags.number, tags.bool, tags.null],
+        color: '#0b6bd3',
+      },
+      {
+        tag: [tags.comment, tags.lineComment, tags.blockComment],
+        color: '#8f92aa',
+        fontStyle: 'italic',
+      },
+      {
+        tag: [tags.variableName, tags.propertyName],
+        color: '#1a1a2e',
+      },
+      {
+        tag: [tags.punctuation, tags.separator, tags.bracket],
+        color: '#5b627c',
+      },
+    ]),
+  ),
+]
+
 function getTaskReward(task: PracticeTask, hintCount: number) {
   const multiplier = Math.max(0, 1 - hintCount * 0.1)
   return Math.round(task.xp * multiplier)
+}
+
+function normalizeRuntimeOutput(value: string) {
+  return value.replace(/\r/g, '').trimEnd()
+}
+
+function stripCodeComments(value: string) {
+  return value
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '')
+}
+
+function normalizeCodeForIncludes(value: string, stripStrings = false) {
+  const withoutComments = stripCodeComments(value)
+  const withoutStrings = stripStrings
+    ? withoutComments
+        .replace(/"(?:\\.|[^"\\])*"/g, '""')
+        .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    : withoutComments
+
+  return withoutStrings.replace(/\s+/g, '')
+}
+
+function codeIncludesSnippet(source: string, snippet: string, stripStrings = false) {
+  return normalizeCodeForIncludes(source, stripStrings).includes(normalizeCodeForIncludes(snippet, stripStrings))
 }
 
 function normalizeLooseText(value: string) {
@@ -739,11 +865,33 @@ function normalizeLooseText(value: string) {
     .trim()
 }
 
-function extractPrintlnLines(source: string) {
-  return [...source.matchAll(/System\.out\.println\(\s*"([^"]+)"\s*\);/g)].map((match) => match[1].trim())
+function splitOutputLines(value: string) {
+  const normalized = normalizeRuntimeOutput(value)
+  return normalized ? normalized.split('\n').map((line) => line.trimEnd()) : []
 }
 
-function evaluatePracticeTask(task: PracticeTask, source: string): TaskEvaluation {
+function countPrintlnCalls(source: string) {
+  return [...source.matchAll(/System\.out\.println\s*\(/g)].length
+}
+
+function formatExecutionError(result: {
+  stage: 'compile' | 'run'
+  stderr: string
+  stdout: string
+}) {
+  const details = normalizeRuntimeOutput(result.stderr || result.stdout) || 'Program nie zakonczyl sie poprawnie.'
+
+  return `${result.stage === 'compile' ? 'Blad kompilacji' : 'Blad uruchomienia'}:\n${details}`
+}
+
+function formatOutputMismatch(expectedLines: string[], actualLines: string[]) {
+  const expected = expectedLines.join('\n')
+  const actual = actualLines.length > 0 ? actualLines.join('\n') : '(brak outputu)'
+
+  return `Output jest niepoprawny.\n\nOczekiwano:\n${expected}\n\nOtrzymano:\n${actual}`
+}
+
+function evaluatePracticeDraft(task: PracticeTask, source: string) {
   const normalized = source.replace(/\r/g, '')
   const hasMain = /public\s+class\s+Main/.test(normalized) && /public\s+static\s+void\s+main/.test(normalized)
 
@@ -754,74 +902,135 @@ function evaluatePracticeTask(task: PracticeTask, source: string): TaskEvaluatio
     }
   }
 
-  if (task.id === 'task-fill') {
-    if (/_____/g.test(normalized)) {
-      return {
-        success: false,
-        message: 'Najpierw uzupelnij wszystkie puste miejsca.',
-      }
-    }
+  const validation = task.validation
 
-    const outputLines = extractPrintlnLines(normalized)
-
-    if (outputLines[0] !== 'Witaj, JavaPath!') {
-      return {
-        success: false,
-        message: 'Sprawdz tresc komunikatu. Output ma byc dokladnie: Witaj, JavaPath!',
-      }
-    }
-
-    return {
-      success: true,
-      message: task.successMessage,
-      output: outputLines.join('\n'),
-    }
-  }
-
-  if (task.id === 'task-scratch') {
-    const outputLines = extractPrintlnLines(normalized)
-
-    if (outputLines.length < 2) {
-      return {
-        success: false,
-        message: 'Potrzebujesz dwoch osobnych linii println, nie jednej.',
-      }
-    }
-
-    const firstLineOk = normalizeLooseText(outputLines[0]).includes('start program')
-    const secondLineOk = normalizeLooseText(outputLines[1]).includes('kod dziala')
-
-    if (!firstLineOk || !secondLineOk) {
-      return {
-        success: false,
-        message: 'Patrz na wynik: program ma wypisac dwie linie o starcie programu i tym, ze kod dziala.',
-      }
-    }
-
-    return {
-      success: true,
-      message: task.successMessage,
-      output: outputLines.slice(0, 2).join('\n'),
-    }
-  }
-
-  if (/system\.out/.test(normalized)) {
+  if (validation?.placeholdersDisallowed && /_____/g.test(normalized)) {
     return {
       success: false,
-      message: 'Java rozroznia wielkosc liter. Uzyj System.out.println, nie system.out.println.',
+      message: 'Najpierw uzupelnij wszystkie puste miejsca.',
     }
   }
 
-  if (!/System\.out\.println\(\s*"Mam pierwszy program"\s*\);/.test(normalized)) {
+  if (validation?.minPrintlnCount && countPrintlnCalls(normalized) < validation.minPrintlnCount) {
     return {
       success: false,
-      message: 'Napraw println tak, aby wypisywal dokladnie: Mam pierwszy program',
+      message: 'Dodaj jeszcze brakujace wywolania System.out.println.',
+    }
+  }
+
+  if (validation?.forbiddenIncludes?.some((snippet) => codeIncludesSnippet(normalized, snippet, true))) {
+    return {
+      success: false,
+      message: 'Masz w kodzie element, ktory trzeba jeszcze poprawic.',
+    }
+  }
+
+  return {
+    success: true,
+    message: 'Finalny wynik sprawdzisz po kompilacji i uruchomieniu programu.',
+  }
+}
+
+function evaluatePracticeTask(task: PracticeTask, source: string, runtimeOutput: string): TaskEvaluation {
+  const normalized = source.replace(/\r/g, '')
+  const hasMain = /public\s+class\s+Main/.test(normalized) && /public\s+static\s+void\s+main/.test(normalized)
+
+  if (!hasMain) {
+    return {
+      success: false,
+      message: 'Zostaw klase Main i metode main jako punkt startu programu.',
+    }
+  }
+
+  const validation = task.validation
+
+  if (validation?.placeholdersDisallowed && /_____/g.test(normalized)) {
+    return {
+      success: false,
+      message: 'Najpierw uzupelnij wszystkie puste miejsca.',
+    }
+  }
+
+  if (validation?.minPrintlnCount && countPrintlnCalls(normalized) < validation.minPrintlnCount) {
+    return {
+      success: false,
+      message: validation.failureMessage,
+    }
+  }
+
+  if (validation?.forbiddenIncludes?.some((snippet) => codeIncludesSnippet(normalized, snippet, true))) {
+    return {
+      success: false,
+      message: validation.failureMessage,
+    }
+  }
+
+  if (validation?.requiredIncludes?.some((snippet) => !codeIncludesSnippet(normalized, snippet))) {
+    return {
+      success: false,
+      message: validation.failureMessage,
+    }
+  }
+
+  if (
+    validation?.requiredPatterns?.some((pattern) => {
+      const expression = new RegExp(pattern, 'm')
+      return !expression.test(normalized)
+    })
+  ) {
+    return {
+      success: false,
+      message: validation.failureMessage,
+    }
+  }
+
+  const outputLines = splitOutputLines(runtimeOutput)
+
+  if (validation?.exactOutputLines) {
+    const exactMatch =
+      validation.exactOutputLines.length === outputLines.length &&
+      validation.exactOutputLines.every((line, index) => outputLines[index] === line)
+
+    if (!exactMatch) {
+      return {
+        success: false,
+        message: formatOutputMismatch(validation.exactOutputLines, outputLines),
+      }
+    }
+  }
+
+  if (validation?.includesOutputPhrases) {
+    const missingPhrases = validation.includesOutputPhrases.filter(
+      (phrase) => !normalizeLooseText(runtimeOutput).includes(normalizeLooseText(phrase)),
+    )
+
+    if (missingPhrases.length > 0) {
+      return {
+        success: false,
+        message: `Wynik programu nie zawiera jeszcze wszystkich wymaganych elementow.\n\nBrakuje:\n- ${missingPhrases.join(
+          '\n- ',
+        )}\n\nOtrzymano:\n${runtimeOutput || '(brak outputu)'}`,
+      }
+    }
+  }
+
+  if (!validation?.exactOutputLines && !validation?.includesOutputPhrases && task.expectedOutput.trim()) {
+    const expectedLines = splitOutputLines(task.expectedOutput)
+    const exactMatch =
+      expectedLines.length === outputLines.length &&
+      expectedLines.every((line, index) => outputLines[index] === line)
+
+    if (!exactMatch) {
+      return {
+        success: false,
+        message: formatOutputMismatch(expectedLines, outputLines),
+      }
     }
   }
 
   return {
     success: true,
     message: task.successMessage,
-    output: extractPrintlnLines(normalized).join('\n') || task.expectedOutput,
+    output: runtimeOutput || '(brak outputu)',
   }
 }

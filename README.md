@@ -1,6 +1,6 @@
 # JavaPath
 
-JavaPath to frontend aplikacji do nauki Javy w przegladarce. Projekt zawiera dashboard z mapa kursu, ekran lekcji w split-view, edytor CodeMirror dla Javy, output, quiz oraz podstawy gamifikacji.
+JavaPath to przegladarkowa platforma do nauki Javy z dashboardem kursu, ekranem lekcji typu split-view, quizami i systemem postepu. Projekt jest zbudowany jako frontend React/Vite, ale lekcje potrafia juz lokalnie kompilowac i uruchamiac prawdziwy kod Java przez prosty runner HTTP oparty o `javac` i `java`.
 
 ## Stack
 
@@ -8,35 +8,58 @@ JavaPath to frontend aplikacji do nauki Javy w przegladarce. Projekt zawiera das
 - TypeScript
 - Vite
 - CodeMirror 6
+- Firebase Authentication + Realtime Database
 - Lucide React
+- lokalny Java runner (`javac` / `java`)
 
-## Uruchomienie
+## Funkcje
+
+- landing page przed logowaniem
+- rejestracja email/haslo i logowanie Google przez Firebase
+- dashboard z mapa kursu, XP, streakiem i light/dark mode
+- lesson view z pieciokrokowym flow: Hook / Explain / Show / Practice / Wrap-up
+- quiz fullscreen dla kazdego modulu
+- prawdziwe uruchamianie kodu Java w lekcjach
+- obsluga `Scanner` przez podstawienie testowego `stdin` w odpowiednich zadaniach
+- strona ustawien z zapisem preferencji i podstawowych statystyk
+
+## Wymagania
+
+- Node.js 20+
+- Java JDK z dostepnymi komendami `javac` i `java`
+
+## Uruchomienie lokalne
 
 ```bash
 npm install
+npm run java-runner
+```
+
+W drugim terminalu:
+
+```bash
 npm run dev
 ```
 
-Build produkcyjny:
+Alternatywnie build + preview:
 
 ```bash
 npm run build
+npm run preview
 ```
 
-Lint:
+## Skrypty
 
 ```bash
+npm run dev
+npm run build
 npm run lint
+npm run preview
+npm run java-runner
 ```
-
-## Zakres
-
-- Dashboard z hero, kartami postepu i mapa kursu
-- Lesson view z trescia, zadaniem, hintami i przyciskami akcji
-- Edytor `Main.java` z syntax highlightingiem i walidacja front-endowa
-- Quiz fullscreen z ocenianiem odpowiedzi
-- Responsywny sidebar i mobilne zakladki `Lekcja | Kod`
 
 ## Uwagi techniczne
 
-Aktualna implementacja uruchamiania zadania korzysta z lokalnej walidacji front-endowej. Kolejnym krokiem moze byc integracja z Judge0 lub Piston dla wykonywania kodu Java w izolowanym sandboxie.
+- Runner Javy nasluchuje domyslnie na `http://127.0.0.1:4318/run`.
+- To nadal lokalny runner developerski, nie sandbox produkcyjny.
+- Jesli projekt ma trafic publicznie online, nastepnym krokiem powinno byc przeniesienie wykonywania kodu do izolowanego backendu lub uslugi typu Judge0 / wlasny kontener.

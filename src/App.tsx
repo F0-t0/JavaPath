@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import {
   createUserWithEmailAndPassword,
   deleteUser,
@@ -14,24 +14,26 @@ import {
 } from 'firebase/auth'
 import { get, ref, remove, serverTimestamp, update } from 'firebase/database'
 import {
+  Check,
   ChevronDown,
-  ChevronRight,
   CircleCheckBig,
   Flame,
   LayoutDashboard,
+  Lock,
   LogOut,
   Menu,
+  Moon,
   RefreshCw,
   Settings,
+  Sun,
   Trophy,
-  XCircle,
+  X,
   Zap,
 } from 'lucide-react'
-import { dashboardStats, lesson, quizQuestions, courseTracks, type CourseTrack, type ModuleStatus } from './courseData'
+import { dashboardStats, courseTracks, type CourseTrack, type ModuleStatus } from './courseData'
 import {
   AuthPage,
   EmailVerificationPage,
-  FirstRunOverlay,
   VerificationResultPage,
   type AuthMode,
   type AuthSubmitResult,
@@ -41,6 +43,12 @@ import {
 import { auth, db, googleProvider } from './firebase'
 import { LandingPage } from './LandingPage'
 import { LessonSession } from './LessonSession'
+import {
+  defaultLessonId,
+  getLessonByModuleId,
+  getOrderedModuleIds,
+  getQuizQuestionsByModuleId,
+} from './lessonContent'
 import { SettingsPage, type ProfileState, type SettingsState } from './SettingsPage'
 
 type PrivateScreen = 'dashboard' | 'lesson' | 'quiz' | 'settings'
@@ -70,8 +78,8 @@ type SessionUser = {
 const statusLabel: Record<ModuleStatus, string> = {
   locked: 'Zablokowany',
   active: 'W toku',
-  completed: 'Ukonczony',
-  review: 'Do powtorki',
+  completed: 'Ukończony',
+  review: 'Do powtórki',
 }
 
 const statusClass: Record<ModuleStatus, string> = {
@@ -123,7 +131,9 @@ function App() {
   const [authReady, setAuthReady] = useState(false)
   const [databaseReady, setDatabaseReady] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [lessonComplete, setLessonComplete] = useState(false)
+  const [openTrackIds, setOpenTrackIds] = useState<string[]>([])
+  const [currentLessonId, setCurrentLessonId] = useState(defaultLessonId)
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([])
   const [showConfetti, setShowConfetti] = useState(false)
   const [xp, setXp] = useState(dashboardStats.xp)
   const [streak, setStreak] = useState(dashboardStats.streak)
@@ -135,13 +145,16 @@ function App() {
   const [quizScore, setQuizScore] = useState(0)
   const [quizFinished, setQuizFinished] = useState(false)
   const [toast, setToast] = useState<ToastState>(null)
-  const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [selectedGoal, setSelectedGoal] = useState<UserGoal | null>(null)
-  const [startLessonPulse, setStartLessonPulse] = useState(false)
+  const [challengeExpanded, setChallengeExpanded] = useState(false)
   const lastPersistedStateRef = useRef('')
   const databaseWriteErrorShownRef = useRef(false)
-  const visibleTracks = buildVisibleTracks(lessonComplete)
+  const visibleTracks = buildVisibleTracks(completedLessonIds)
   const allModules = visibleTracks.flatMap((track) => track.modules)
+  const currentLesson = getLessonByModuleId(currentLessonId)
+  const currentQuizQuestions = getQuizQuestionsByModuleId(currentLessonId)
+  const lessonComplete = completedLessonIds.includes(currentLessonId)
+  const hasCompletedAnyLesson = completedLessonIds.length > 0
   const totalModules = allModules.length
   const completedModules = allModules.filter((module) => module.status === 'completed').length
   const progressPercentage = Math.round((completedModules / totalModules) * 100)
@@ -155,17 +168,24 @@ function App() {
     totalXp: xp,
     longestStreak,
   }
-  const currentQuestion = quizQuestions[quizIndex]
+  const currentQuestion = currentQuizQuestions[quizIndex]
   const currentScreen = getScreen(route.screen)
+  const resolvedTheme =
+    settingsState.themeMode === 'system'
+      ? window.matchMedia('(prefers-color-scheme: light)').matches
+        ? 'light'
+        : 'dark'
+      : settingsState.themeMode
   const activeBreadcrumb =
     currentScreen === 'dashboard'
-      ? ['Dashboard', 'Twoj postep']
+      ? ['Dashboard', 'Twój postęp']
       : currentScreen === 'quiz'
-        ? [...lesson.breadcrumb, 'Quiz']
-        : lesson.breadcrumb
+        ? [...currentLesson.breadcrumb, 'Quiz']
+        : currentLesson.breadcrumb
 
   function resetLearningState() {
-    setLessonComplete(false)
+    setCurrentLessonId(defaultLessonId)
+    setCompletedLessonIds([])
     setShowConfetti(false)
     setXp(dashboardStats.xp)
     setStreak(dashboardStats.streak)
@@ -176,7 +196,6 @@ function App() {
     setSelectedAnswer(null)
     setQuizScore(0)
     setQuizFinished(false)
-    setStartLessonPulse(false)
   }
 
   useEffect(() => {
@@ -218,8 +237,9 @@ function App() {
           setStreak(progress.streak)
           setTotalMinutes(progress.totalMinutes)
           setLongestStreak(progress.longestStreak)
-          setLessonComplete(progress.lessonComplete)
-          setQuizIndex(progress.quizIndex)
+          setCurrentLessonId(progress.currentLessonId)
+          setCompletedLessonIds(progress.completedLessonIds)
+          setQuizIndex(clamp(progress.quizIndex, 0, Math.max(getQuizQuestionsByModuleId(progress.currentLessonId).length - 1, 0)))
           setSelectedAnswer(progress.selectedAnswer)
           setQuizScore(progress.quizScore)
           setQuizFinished(progress.quizFinished)
@@ -240,7 +260,6 @@ function App() {
                 }
               : value,
           )
-          setNeedsOnboarding(profile.goal === null)
           lastPersistedStateRef.current = JSON.stringify(
             buildPersistedPayload({
               email: currentUser.email,
@@ -257,7 +276,8 @@ function App() {
               streak: progress.streak,
               totalMinutes: progress.totalMinutes,
               longestStreak: progress.longestStreak,
-              lessonComplete: progress.lessonComplete,
+              currentLessonId: progress.currentLessonId,
+              completedLessonIds: progress.completedLessonIds,
               quizIndex: progress.quizIndex,
               selectedAnswer: progress.selectedAnswer,
               quizScore: progress.quizScore,
@@ -270,7 +290,6 @@ function App() {
           setProfileState(createDefaultProfileState(currentUser.name))
           setSettingsState(defaultSettingsState)
           setCurrentUser((value) => (value ? { ...value, goal: null } : value))
-          setNeedsOnboarding(true)
           lastPersistedStateRef.current = JSON.stringify(
             buildPersistedPayload({
               email: currentUser.email,
@@ -282,7 +301,8 @@ function App() {
               streak: dashboardStats.streak,
               totalMinutes: 0,
               longestStreak: 0,
-              lessonComplete: false,
+              currentLessonId: defaultLessonId,
+              completedLessonIds: [],
               quizIndex: 0,
               selectedAnswer: null,
               quizScore: 0,
@@ -296,7 +316,6 @@ function App() {
         setProfileState(createDefaultProfileState(currentUser.name))
         setSettingsState(defaultSettingsState)
         setCurrentUser((value) => (value ? { ...value, goal: null } : value))
-        setNeedsOnboarding(true)
         lastPersistedStateRef.current = ''
         showToast(`Nie udalo sie odczytac danych z bazy. Startuje pusty profil. ${mapDatabaseError(error)}`, 'error')
       } finally {
@@ -323,7 +342,8 @@ function App() {
         streak,
         totalMinutes,
         longestStreak,
-        lessonComplete,
+        currentLessonId,
+        completedLessonIds,
         quizIndex,
         selectedAnswer,
         quizScore,
@@ -360,7 +380,8 @@ function App() {
     currentUser?.email,
     currentUser?.name,
     databaseReady,
-    lessonComplete,
+    completedLessonIds,
+    currentLessonId,
     longestStreak,
     profileState,
     quizFinished,
@@ -405,20 +426,18 @@ function App() {
   }, [authReady, currentUser, pendingRegistration, route.screen])
 
   useEffect(() => {
-    if (!showConfetti && !streakPulse && !startLessonPulse) {
+    if (!showConfetti && !streakPulse) {
       return
     }
 
     const confettiTimer = window.setTimeout(() => setShowConfetti(false), 2000)
     const streakTimer = window.setTimeout(() => setStreakPulse(false), 1000)
-    const pulseTimer = window.setTimeout(() => setStartLessonPulse(false), 2000)
 
     return () => {
       window.clearTimeout(confettiTimer)
       window.clearTimeout(streakTimer)
-      window.clearTimeout(pulseTimer)
     }
-  }, [showConfetti, startLessonPulse, streakPulse])
+  }, [showConfetti, streakPulse])
 
   useEffect(() => {
     if (!toast) {
@@ -431,13 +450,6 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement
-    const resolvedTheme =
-      settingsState.themeMode === 'system'
-        ? window.matchMedia('(prefers-color-scheme: light)').matches
-          ? 'light'
-          : 'dark'
-        : settingsState.themeMode
-
     const bodySize = settingsState.bodyTextSize === 'small' ? '13px' : settingsState.bodyTextSize === 'large' ? '17px' : '15px'
     const editorFamily =
       settingsState.editorFont === 'jetbrains'
@@ -458,15 +470,38 @@ function App() {
     settingsState.editorFont,
     settingsState.editorFontSize,
     settingsState.editorLigatures,
-    settingsState.themeMode,
+    resolvedTheme,
   ])
 
   const showToast = (message: string, tone: ToastTone = 'neutral') => {
     setToast({ message, tone })
   }
 
-  const navigateApp = (nextScreen: PrivateScreen) => {
+  const collapseSidebarTracks = () => {
+    setOpenTrackIds([])
+  }
+
+  const closeSidebar = () => {
     setSidebarOpen(false)
+    collapseSidebarTracks()
+  }
+
+  const toggleTrackAccordion = (trackId: string) => {
+    setOpenTrackIds((current) =>
+      current.includes(trackId) ? current.filter((id) => id !== trackId) : [...current, trackId],
+    )
+  }
+
+  const handleSidebarMouseLeave = () => {
+    if (window.matchMedia('(max-width: 920px)').matches) {
+      return
+    }
+
+    collapseSidebarTracks()
+  }
+
+  const navigateApp = (nextScreen: PrivateScreen) => {
+    closeSidebar()
     startTransition(() => navigateTo(getPathForScreen(nextScreen), setRouteKey))
   }
 
@@ -474,7 +509,6 @@ function App() {
     setDatabaseReady(false)
     resetLearningState()
     setPendingRegistration(null)
-    setNeedsOnboarding(false)
     setSelectedGoal(null)
     setProfileState(createDefaultProfileState())
     setSettingsState(defaultSettingsState)
@@ -508,6 +542,22 @@ function App() {
     }))
   }
 
+  const handleThemeToggle = () => {
+    setSettingsState((value) => {
+      const currentTheme =
+        value.themeMode === 'system'
+          ? window.matchMedia('(prefers-color-scheme: light)').matches
+            ? 'light'
+            : 'dark'
+          : value.themeMode
+
+      return {
+        ...value,
+        themeMode: currentTheme === 'light' ? 'dark' : 'light',
+      }
+    })
+  }
+
   const handleExportData = () => {
     const exportPayload = {
       exportedAt: new Date().toISOString(),
@@ -523,7 +573,8 @@ function App() {
         streak,
         totalMinutes,
         longestStreak,
-        lessonComplete,
+        currentLessonId,
+        completedLessonIds,
         quizIndex,
         selectedAnswer,
         quizScore,
@@ -542,7 +593,7 @@ function App() {
   }
 
   const handleResetModuleProgress = () => {
-    setLessonComplete(false)
+    setCompletedLessonIds((current) => current.filter((lessonId) => lessonId !== currentLessonId))
     setQuizIndex(0)
     setSelectedAnswer(null)
     setQuizScore(0)
@@ -569,7 +620,6 @@ function App() {
       setCurrentUser(null)
       setPendingRegistration(null)
       setSelectedGoal(null)
-      setNeedsOnboarding(false)
       setProfileState(createDefaultProfileState())
       setSettingsState(defaultSettingsState)
       navigateTo('/', setRouteKey, true)
@@ -580,12 +630,17 @@ function App() {
     }
   }
 
-  const handleModuleOpen = (status: ModuleStatus, title: string) => {
+  const handleModuleOpen = (moduleId: string, status: ModuleStatus, title: string) => {
     if (status === 'locked') {
       showToast(`Modul "${title}" jest jeszcze zablokowany. Najpierw ukoncz poprzedni etap.`, 'neutral')
       return
     }
 
+    setCurrentLessonId(moduleId)
+    setQuizIndex(0)
+    setSelectedAnswer(null)
+    setQuizScore(0)
+    setQuizFinished(false)
     navigateApp('lesson')
   }
 
@@ -603,6 +658,14 @@ function App() {
   }
 
   const openFirstLesson = () => {
+    const activeModule = allModules.find((module) => module.status === 'active') ?? allModules[0]
+    if (activeModule) {
+      setCurrentLessonId(activeModule.id)
+    }
+    setQuizIndex(0)
+    setSelectedAnswer(null)
+    setQuizScore(0)
+    setQuizFinished(false)
     navigateApp('lesson')
   }
 
@@ -633,7 +696,7 @@ function App() {
       return
     }
 
-    if (quizIndex === quizQuestions.length - 1) {
+    if (quizIndex === currentQuizQuestions.length - 1) {
       setQuizFinished(true)
       setXp((value) => value + 60)
       return
@@ -648,7 +711,7 @@ function App() {
       return
     }
 
-    setLessonComplete(true)
+    setCompletedLessonIds((current) => (current.includes(currentLessonId) ? current : [...current, currentLessonId]))
     setShowConfetti(true)
     setStreakPulse(true)
     setStreak((current) => {
@@ -718,7 +781,6 @@ function App() {
       }
 
       setSelectedGoal(null)
-      setNeedsOnboarding(false)
       resetLearningState()
       navigateTo('/dashboard', setRouteKey)
       showToast('Witaj ponownie. Mozesz kontynuowac nauke.', 'success')
@@ -739,7 +801,6 @@ function App() {
       const nextUser = mapFirebaseUser(credential.user)
       setCurrentUser(nextUser)
       setSelectedGoal(null)
-      setNeedsOnboarding(false)
       resetLearningState()
       navigateTo('/dashboard', setRouteKey)
       showToast('Konto Google jest gotowe. Mozesz zaczynac.', 'success')
@@ -766,7 +827,6 @@ function App() {
     }
 
     setCurrentUser(mapFirebaseUser(refreshedUser))
-    setNeedsOnboarding(false)
     setPendingRegistration(null)
     resetLearningState()
     navigateTo('/weryfikuj?token=success', setRouteKey)
@@ -800,16 +860,6 @@ function App() {
     navigateTo('/rejestracja', setRouteKey)
   }
 
-  const handleFinishOnboarding = () => {
-    if (currentUser) {
-      const nextGoal = selectedGoal
-      setCurrentUser((value) => (value ? { ...value, goal: nextGoal } : value))
-    }
-
-    setNeedsOnboarding(false)
-    setStartLessonPulse(true)
-  }
-
   if (route.screen === 'verify-result') {
     return (
       <>
@@ -839,7 +889,7 @@ function App() {
         <section className="verify-card">
           <p className="eyebrow">JavaPath</p>
           <h1>Wczytywanie konta...</h1>
-          <p className="verify-copy">Pobieram Twoj profil i zapisany postep z Realtime Database.</p>
+          <p className="verify-copy">Pobieram Twój profil i zapisany postęp z Realtime Database.</p>
         </section>
       </div>
     )
@@ -936,10 +986,17 @@ function App() {
   }
 
   return (
-    <div className={`app-shell ${needsOnboarding ? 'app-shell-blurred' : ''}`.trim()}>
+    <div className="app-shell">
       {showConfetti && <ConfettiBurst />}
 
-      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`sidebar dashboard-sidebar ${sidebarOpen ? 'open' : ''}`} onMouseLeave={handleSidebarMouseLeave}>
+        <button
+          type="button"
+          className="sidebar-touch-toggle"
+          aria-label={sidebarOpen ? 'Zwin pasek poziomow' : 'Rozwin pasek poziomow'}
+          aria-expanded={sidebarOpen}
+          onClick={() => setSidebarOpen((current) => !current)}
+        />
         <div className="sidebar-brand">
           <button type="button" className="sidebar-home-button sidebar-copy" onClick={() => navigateApp('dashboard')}>
             <p className="eyebrow">Java learning path</p>
@@ -949,9 +1006,9 @@ function App() {
             type="button"
             className="icon-button mobile-only"
             aria-label="Zamknij menu"
-            onClick={() => setSidebarOpen(false)}
+            onClick={closeSidebar}
           >
-            <XCircle size={18} />
+            <X size={18} />
           </button>
         </div>
 
@@ -967,31 +1024,43 @@ function App() {
           </div>
         </section>
 
-        <nav className="sidebar-nav" aria-label="Sciezki kursu">
+        <nav className="sidebar-nav" aria-label="Ścieżki kursu">
           {visibleTracks.map((track, index) => (
             <TrackAccordion
               key={track.id}
               index={index}
               track={track}
+              isOpen={openTrackIds.includes(track.id)}
+              onToggle={() => toggleTrackAccordion(track.id)}
               onOpenLesson={handleModuleOpen}
             />
           ))}
         </nav>
 
         <div className="sidebar-footer">
-          <button type="button" className="ghost-link" onClick={() => navigateApp('settings')}>
+          <button
+            type="button"
+            className="ghost-link sidebar-icon-link"
+            data-tooltip="Ustawienia"
+            aria-label="Ustawienia"
+            onClick={() => navigateApp('settings')}
+          >
             <Settings size={16} />
-            <span>Ustawienia</span>
           </button>
-          <button type="button" className="ghost-link" onClick={handleLogout}>
+          <button
+            type="button"
+            className="ghost-link sidebar-icon-link"
+            data-tooltip="Wyloguj"
+            aria-label="Wyloguj"
+            onClick={handleLogout}
+          >
             <LogOut size={16} />
-            <span>Logout</span>
           </button>
         </div>
       </aside>
 
       {sidebarOpen && (
-        <button type="button" className="sidebar-backdrop" aria-label="Zamknij menu" onClick={() => setSidebarOpen(false)} />
+        <button type="button" className="sidebar-backdrop" aria-label="Zamknij menu" onClick={closeSidebar} />
       )}
 
       <div className="workspace">
@@ -1007,16 +1076,25 @@ function App() {
             </button>
 
             <div>
-              <p className="eyebrow">Sciezka aktywna</p>
+              <p className="eyebrow">Ścieżka aktywna</p>
               <div className="breadcrumb">
                 {activeBreadcrumb.map((item, index) => (
-                  <span key={item}>
-                    {index > 0 && <ChevronRight size={14} />}
+                  <span key={item} className="breadcrumb-item">
+                    {index > 0 && <span className="breadcrumb-separator">›</span>}
                     {item}
                   </span>
                 ))}
               </div>
             </div>
+
+            <button
+              type="button"
+              className="theme-toggle-button"
+              aria-label={resolvedTheme === 'light' ? 'Wlacz ciemny motyw' : 'Wlacz jasny motyw'}
+              onClick={handleThemeToggle}
+            >
+              {resolvedTheme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
           </div>
 
           <div className="topbar-right">
@@ -1032,130 +1110,185 @@ function App() {
         <main className={`main-panel ${currentScreen === 'quiz' ? 'quiz-open' : ''}`}>
           {currentScreen === 'dashboard' && (
             <section className="dashboard">
-              <section className="hero-strip">
-                <div>
+              <section className="hero-strip dashboard-hero">
+                <div className="dashboard-hero-copy">
                   <p className="eyebrow">Dark IDE meets learning game</p>
-                  <h2>Witaj, {displayName}. Twoja seria: {streak} dni.</h2>
-                  <p>
-                    Konto startuje bez postepu. Otworz pierwsza lekcje, uruchom kod w przegladarce i odblokuj dalsze
-                    elementy platformy.
-                  </p>
+                  <h2>Witaj ponownie, {displayName}. Czas wrócić do kodu.</h2>
+                  <p>Aktywny moduł: „{allModules.find((module) => module.status === 'active')?.title ?? 'Twój pierwszy program'}”.</p>
                 </div>
                 <button
                   type="button"
-                  className={`primary-button ${startLessonPulse ? 'primary-button-pulse' : ''}`.trim()}
+                  className="primary-button hero-cta"
                   onClick={openFirstLesson}
                 >
-                  Rozpocznij pierwsza lekcje
-                  <ChevronRight size={16} />
+                  Rozpocznij pierwszą lekcję
+                  <span className="hero-cta-arrow">→</span>
                 </button>
+                <div className="hero-progress-bar" aria-hidden="true">
+                  <span style={{ width: `${Math.max(progressPercentage, 8)}%` }} />
+                </div>
               </section>
 
-              <section className="card-grid">
-                <article className="progress-card strong">
-                  <header>
+              <section className="dashboard-card-grid">
+                <article className="progress-card dashboard-card-strong">
+                  <header className="dashboard-card-header">
+                    <div>
+                      <p className="eyebrow">Twój postęp</p>
+                      <h3>Postęp kursu</h3>
+                      <p>Następny moduł: {dashboardStats.nextModule}</p>
+                    </div>
                     <div className="card-icon">
                       <LayoutDashboard size={18} />
                     </div>
-                    <div>
-                      <h3>Twoj postep</h3>
-                      <p>Nastepny modul: {dashboardStats.nextModule}</p>
-                    </div>
                   </header>
-                  <div className="ring-metric">
-                    <div className="ring" style={{ '--progress': `${progressPercentage}%` } as CSSProperties}>
-                      <span>{progressPercentage}%</span>
-                    </div>
-                    <div className="card-copy">
-                      <strong>
-                        {completedModules} z {totalModules} modulow
-                      </strong>
-                      <p>Startujesz bez historii. Pierwszy ukonczony modul odblokuje XP, streak i quiz.</p>
-                    </div>
+
+                  <div className="course-progress-strip" aria-label="Segmentowany postęp modułów">
+                    {allModules.map((module) => (
+                      <span key={module.id} className={`course-progress-segment ${module.status}`} />
+                    ))}
+                  </div>
+
+                  <div className="course-progress-legend">
+                    <span className="legend-item"><i className="legend-dot completed" />Ukończony</span>
+                    <span className="legend-item"><i className="legend-dot active" />W toku</span>
+                    <span className="legend-item"><i className="legend-dot locked" />Zablokowany</span>
+                  </div>
+
+                  <div className="dashboard-card-footer-copy">
+                    <strong>{completedModules} z {totalModules} modułów ukończonych</strong>
+                    <p>Pierwszy ukończony moduł odblokuje kolejne lekcje, quiz i powtórki.</p>
                   </div>
                 </article>
 
-                <article className="progress-card">
-                  <header>
+                <article className="progress-card dashboard-card-equal">
+                  <header className="dashboard-card-header">
+                    <div>
+                      <p className="eyebrow">Dziś do powtórki</p>
+                      <h3>Kolejka powtórek</h3>
+                      <p>Algorytm 7 / 14 / 30 dni</p>
+                    </div>
                     <div className="card-icon">
                       <RefreshCw size={18} />
                     </div>
-                    <div>
-                      <h3>Dzis do powtorki</h3>
-                      <p>Algorytm 7 / 14 / 30 dni</p>
-                    </div>
                   </header>
+
                   {reviewModules.length > 0 ? (
-                    <ul className="compact-list">
-                      {reviewModules.map((module) => (
-                        <li key={module.id}>
-                          <span>{module.title}</span>
-                          <span className="tag warning">Powtorka</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      <ul className="compact-list">
+                        {reviewModules.map((module) => (
+                          <li key={module.id}>
+                            <span>{module.title}</span>
+                            <span className="tag warning">Powtórka</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <button type="button" className="secondary-button" onClick={handleReviewAction}>
+                        Zacznij powtórkę
+                      </button>
+                    </>
                   ) : (
-                    <div className="empty-card-state">
-                      <p>Brak powtorek. Ukarcz pierwszy modul, a system zacznie planowac odswiezki.</p>
+                    <div className="review-empty-state">
+                      <div className="review-empty-icon" aria-hidden="true">
+                        <svg viewBox="0 0 48 48" fill="none">
+                          <rect x="10" y="11" width="28" height="24" rx="6" stroke="currentColor" strokeWidth="2" />
+                          <path d="M16 8V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          <path d="M32 8V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          <path d="M10 18H38" stroke="currentColor" strokeWidth="2" />
+                          <path d="M19.5 26L23 29.5L29.5 23" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <div>
+                        <strong>Ukończ pierwszy moduł, aby odblokować powtórki</strong>
+                        <p>JavaPath zacznie planować krótkie odświeżki po pierwszej ukończonej lekcji.</p>
+                      </div>
+                      <button type="button" className="secondary-button" onClick={openFirstLesson}>
+                        Przejdź do pierwszej lekcji
+                      </button>
                     </div>
                   )}
-                  <button type="button" className="secondary-button" onClick={handleReviewAction}>
-                    {reviewModules.length > 0 ? 'Zacznij powtorke' : 'Przejdz do pierwszej lekcji'}
-                  </button>
                 </article>
 
-                <article className="progress-card">
-                  <header>
+                <article className="progress-card dashboard-card-equal">
+                  <header className="dashboard-card-header">
+                    <div>
+                      <p className="eyebrow">Wyzwanie dnia</p>
+                      <h3>Krótki challenge na dziś</h3>
+                      <p>{hasCompletedAnyLesson ? 'Aktywne jeszcze 24h' : 'Odblokuje się po module 1'}</p>
+                    </div>
                     <div className="card-icon">
                       <Trophy size={18} />
                     </div>
-                    <div>
-                      <h3>Wyzwanie dnia</h3>
-                      <p>{lessonComplete ? 'Aktywne jeszcze 24h' : 'Odblokuje sie po module 1'}</p>
-                    </div>
                   </header>
-                  <div className="challenge-card">
-                    <strong>{dashboardStats.challengeTitle}</strong>
-                    <p>
-                      {lessonComplete
-                        ? 'Jedno zadanie na output, concatenation i czytelny format komunikatu.'
-                        : 'Challenge startuje dopiero po pierwszym sukcesie, zeby nie wrzucac nowego uzytkownika na gleboka wode.'}
-                    </p>
-                    <div className="challenge-meta">
-                      <span className={`tag ${lessonComplete ? 'success' : 'warning'}`}>
-                        {lessonComplete ? '40 XP' : 'Zablokowane'}
+
+                  <div className="challenge-panel">
+                    <div className="challenge-topline">
+                      <strong>{hasCompletedAnyLesson ? 'Wypisz poprawny komunikat dla użytkownika' : dashboardStats.challengeTitle}</strong>
+                      <span className={`challenge-xp-pill ${hasCompletedAnyLesson ? 'active' : 'locked'}`}>
+                        {hasCompletedAnyLesson ? '40 XP' : 'Wkrótce'}
                       </span>
-                      <button type="button" className="text-link" onClick={openFirstLesson}>
-                        {lessonComplete ? 'Otworz zadanie' : 'Przejdz do lekcji'}
-                      </button>
                     </div>
+
+                    <button type="button" className="primary-button challenge-cta" onClick={hasCompletedAnyLesson ? openQuiz : openFirstLesson}>
+                      {hasCompletedAnyLesson ? 'Otwórz wyzwanie' : 'Przejdź do lekcji'}
+                      <span className="hero-cta-arrow">→</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="challenge-toggle"
+                      aria-expanded={challengeExpanded}
+                      onClick={() => setChallengeExpanded((value) => !value)}
+                    >
+                      <span>{challengeExpanded ? 'Ukryj szczegóły' : 'Pokaż szczegóły'}</span>
+                      <ChevronDown size={16} className={challengeExpanded ? 'open' : ''} />
+                    </button>
+
+                    {challengeExpanded && (
+                      <p className="challenge-expand-copy">
+                        {hasCompletedAnyLesson
+                          ? 'Zadanie sprawdza poprawny output, konkatenację napisów i czytelny format komunikatu dla użytkownika.'
+                          : 'Wyzwanie dnia pojawia się dopiero po pierwszym sukcesie, żeby nie wrzucać nowej osoby na zbyt głęboką wodę.'}
+                      </p>
+                    )}
                   </div>
                 </article>
               </section>
 
-              <section className="course-map">
-                <div className="section-heading">
+              <section className="course-map dashboard-course-map">
+                <div className="dashboard-map-header">
                   <div>
                     <p className="eyebrow">Mapa kursu</p>
-                    <h3>Wizualna sciezka nauki</h3>
+                    <h3>Wizualna ścieżka nauki</h3>
+                    <div className="dashboard-map-legend">
+                      <span className="legend-item"><i className="legend-dot completed" />Ukończony</span>
+                      <span className="legend-item"><i className="legend-dot active" />Aktywny</span>
+                      <span className="legend-item"><i className="legend-dot locked" />Zablokowany</span>
+                    </div>
                   </div>
                   <button type="button" className="secondary-button" onClick={openFirstLesson}>
-                    Otworz aktywny modul
+                    Otwórz aktywny moduł
                   </button>
                 </div>
 
-                <div className="map-nodes" aria-label="Mapa modulow">
+                <div className="dashboard-map-track" aria-label="Mapa modułów">
                   {allModules.map((module, index) => (
-                    <div key={module.id} className="map-node-group">
+                    <div key={module.id} className={`dashboard-map-node ${module.status}`.trim()}>
                       <button
                         type="button"
                         className={`map-node ${module.status}`}
-                        onClick={() => handleModuleOpen(module.status, module.title)}
+                        aria-label={module.status === 'locked' ? `${module.title} - zablokowany` : module.title}
+                        onClick={() => handleModuleOpen(module.id, module.status, module.title)}
                       >
-                        <span>{index + 1}</span>
+                        {module.status === 'completed' ? (
+                          <Check size={24} strokeWidth={2.4} />
+                        ) : module.status === 'locked' ? (
+                          <Lock size={20} strokeWidth={2.2} />
+                        ) : (
+                          <span className="map-node-index">{index + 1}</span>
+                        )}
                       </button>
                       <strong>{module.title}</strong>
-                      <p>{statusLabel[module.status]}</p>
+                      {module.status !== 'locked' && <span className={`map-status-chip ${module.status}`}>{statusLabel[module.status]}</span>}
                     </div>
                   ))}
                 </div>
@@ -1165,6 +1298,9 @@ function App() {
 
           {currentScreen === 'lesson' && (
             <LessonSession
+              key={currentLessonId}
+              theme={resolvedTheme}
+              lesson={currentLesson}
               lessonComplete={lessonComplete}
               onAwardXp={(xpValue) => setXp((current) => current + xpValue)}
               onLessonCompleted={handleLessonCompleted}
@@ -1181,12 +1317,12 @@ function App() {
                   <div className="quiz-meta">
                     <span className="eyebrow">Quiz koncowy</span>
                     <span>
-                      Pytanie {quizIndex + 1} / {quizQuestions.length}
+                      Pytanie {quizIndex + 1} / {currentQuizQuestions.length}
                     </span>
                   </div>
 
                   <div className="quiz-progress">
-                    <span style={{ width: `${((quizIndex + 1) / quizQuestions.length) * 100}%` }} />
+                    <span style={{ width: `${((quizIndex + 1) / currentQuizQuestions.length) * 100}%` }} />
                   </div>
 
                   <h2>{currentQuestion.prompt}</h2>
@@ -1239,11 +1375,11 @@ function App() {
                   <CircleCheckBig size={42} />
                   <h2>Quiz zakonczony</h2>
                   <p>
-                    Zdobyty wynik: {quizScore} / {quizQuestions.length}. Bonus za ukonczenie quizu zostal dodany do XP.
+                    Zdobyty wynik: {quizScore} / {currentQuizQuestions.length}. Bonus za ukonczenie quizu zostal dodany do XP.
                   </p>
                   <div className="summary-stats">
                     <span className="tag success">+60 XP</span>
-                    <span className="tag warning">{Math.round((quizScore / quizQuestions.length) * 100)}% skutecznosci</span>
+                    <span className="tag warning">{Math.round((quizScore / currentQuizQuestions.length) * 100)}% skutecznosci</span>
                   </div>
                   <button type="button" className="primary-button" onClick={() => navigateApp('dashboard')}>
                     Wroc na dashboard
@@ -1260,14 +1396,6 @@ function App() {
           {toast.message}
         </div>
       )}
-
-      {needsOnboarding && (
-        <FirstRunOverlay
-          selectedGoal={selectedGoal}
-          onSelectGoal={setSelectedGoal}
-          onContinue={handleFinishOnboarding}
-        />
-      )}
     </div>
   )
 }
@@ -1275,28 +1403,35 @@ function App() {
 function TrackAccordion({
   index,
   track,
+  isOpen,
+  onToggle,
   onOpenLesson,
 }: {
   index: number
   track: CourseTrack
-  onOpenLesson: (status: ModuleStatus, title: string) => void
+  isOpen: boolean
+  onToggle: () => void
+  onOpenLesson: (moduleId: string, status: ModuleStatus, title: string) => void
 }) {
-  const [isOpen, setIsOpen] = useState(false)
   const trackCode = `P${index + 1}`
+  const completedLessons = track.modules.filter((module) => module.status === 'completed').length
+  const activeTrack = track.modules.some((module) => module.status === 'active')
+  const trackTooltip = `${track.level} — ${track.title} (${completedLessons}/${track.modules.length} lekcji)`
 
   return (
-    <section className="track-card">
+    <section className={`track-card ${activeTrack ? 'active' : ''}`.trim()}>
       <button
         type="button"
         className={`track-toggle ${isOpen ? 'open' : ''}`}
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((value) => !value)}
+        title={trackTooltip}
+        onClick={onToggle}
       >
         <div className="track-glyph">{trackCode}</div>
         <div className="track-copy">
           <p className="eyebrow">{track.level}</p>
           <h2>{track.title}</h2>
-          <p>{track.summary}</p>
+          <p>{completedLessons}/{track.modules.length} lekcji</p>
         </div>
         <ChevronDown size={16} className={`track-chevron ${isOpen ? 'open' : ''}`} />
       </button>
@@ -1313,7 +1448,7 @@ function TrackAccordion({
                 key={module.id}
                 type="button"
                 className={`module-row ${module.status}`}
-                onClick={() => onOpenLesson(module.status, module.title)}
+                onClick={() => onOpenLesson(module.id, module.status, module.title)}
               >
                 <div className="module-copy">
                   <strong>{module.title}</strong>
@@ -1361,12 +1496,15 @@ function ConfettiBurst() {
   )
 }
 
-function buildVisibleTracks(lessonComplete: boolean) {
+function buildVisibleTracks(completedLessonIds: string[]): CourseTrack[] {
+  const completedSet = new Set(completedLessonIds)
+  let activeAssigned = false
+
   return courseTracks.map((track) => {
     let completedInTrack = 0
 
     const modules = track.modules.map((module) => {
-      if (track.id === 'fundamenty' && lessonComplete && module.id === 'hello-world') {
+      if (completedSet.has(module.id)) {
         completedInTrack += 1
         return {
           ...module,
@@ -1374,18 +1512,18 @@ function buildVisibleTracks(lessonComplete: boolean) {
         }
       }
 
-      if (track.id === 'fundamenty' && lessonComplete && module.id === 'zmienne') {
+      if (!activeAssigned) {
+        activeAssigned = true
         return {
           ...module,
           status: 'active' as const,
         }
       }
 
-      if (module.status === 'completed') {
-        completedInTrack += 1
+      return {
+        ...module,
+        status: 'locked' as const,
       }
-
-      return module
     })
 
     return {
@@ -1536,7 +1674,8 @@ function buildPersistedPayload({
   streak,
   totalMinutes,
   longestStreak,
-  lessonComplete,
+  currentLessonId,
+  completedLessonIds,
   quizIndex,
   selectedAnswer,
   quizScore,
@@ -1551,7 +1690,8 @@ function buildPersistedPayload({
   streak: number
   totalMinutes: number
   longestStreak: number
-  lessonComplete: boolean
+  currentLessonId: string
+  completedLessonIds: string[]
   quizIndex: number
   selectedAnswer: number | null
   quizScore: number
@@ -1573,7 +1713,8 @@ function buildPersistedPayload({
       streak,
       totalMinutes,
       longestStreak,
-      lessonComplete,
+      currentLessonId,
+      completedLessonIds,
       quizIndex,
       selectedAnswer,
       quizScore,
@@ -1625,14 +1766,24 @@ function readSettings(data: Record<string, unknown>): SettingsState {
 
 function readProgress(data: Record<string, unknown>) {
   const rawProgress = isRecord(data.progress) ? data.progress : {}
+  const completedLessonIds = Array.isArray(rawProgress.completedLessonIds)
+    ? rawProgress.completedLessonIds.filter((value): value is string => typeof value === 'string')
+    : (rawProgress.lessonComplete ? [defaultLessonId] : [])
+  const fallbackLessonId = completedLessonIds[completedLessonIds.length - 1] ?? defaultLessonId
+  const currentLessonId =
+    typeof rawProgress.currentLessonId === 'string' && getOrderedModuleIds().includes(rawProgress.currentLessonId)
+      ? rawProgress.currentLessonId
+      : fallbackLessonId
+  const currentQuizLength = getQuizQuestionsByModuleId(currentLessonId).length
 
   return {
     xp: toNumber(rawProgress.xp, dashboardStats.xp),
     streak: toNumber(rawProgress.streak, dashboardStats.streak),
     totalMinutes: toNumber(rawProgress.totalMinutes, 0),
     longestStreak: toNumber(rawProgress.longestStreak, 0),
-    lessonComplete: Boolean(rawProgress.lessonComplete),
-    quizIndex: clamp(toNumber(rawProgress.quizIndex, 0), 0, Math.max(quizQuestions.length - 1, 0)),
+    currentLessonId,
+    completedLessonIds,
+    quizIndex: clamp(toNumber(rawProgress.quizIndex, 0), 0, Math.max(currentQuizLength - 1, 0)),
     selectedAnswer: rawProgress.selectedAnswer === null || rawProgress.selectedAnswer === undefined
       ? null
       : clamp(toNumber(rawProgress.selectedAnswer, 0), 0, 3),
