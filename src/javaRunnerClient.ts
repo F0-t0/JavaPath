@@ -7,9 +7,25 @@ export type JavaExecutionResult = {
   durationMs: number
 }
 
-const JAVA_RUNNER_URL = 'http://127.0.0.1:4318/run'
+const isLocalHost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+
+const JAVA_RUNNER_URL = import.meta.env.VITE_JAVA_RUNNER_URL || (isLocalHost ? 'http://127.0.0.1:4318/run' : '')
 
 export async function executeJava(source: string, stdin = ''): Promise<JavaExecutionResult> {
+  if (!JAVA_RUNNER_URL) {
+    return {
+      ok: false,
+      stage: 'run',
+      stdout: '',
+      stderr:
+        'Ta publiczna wersja nie ma jeszcze podlaczonego backendu do uruchamiania kodu Java. Lokalnie uzyj npm run java-runner albo podepnij zewnetrzny runner przez VITE_JAVA_RUNNER_URL.',
+      exitCode: null,
+      durationMs: 0,
+    }
+  }
+
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 8000)
 

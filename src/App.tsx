@@ -51,6 +51,8 @@ import {
 } from './lessonContent'
 import { SettingsPage, type ProfileState, type SettingsState } from './SettingsPage'
 
+const APP_BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL)
+
 type PrivateScreen = 'dashboard' | 'lesson' | 'quiz' | 'settings'
 type PublicScreen = 'landing' | 'register' | 'login' | 'verify-email' | 'verify-result'
 type AppScreen = PrivateScreen | PublicScreen
@@ -1553,7 +1555,7 @@ function getRouteKey() {
 
 function parseRoute(routeKey: string): { screen: AppScreen; verifyStatus: VerifyResultStatus } {
   const url = new URL(routeKey, window.location.origin)
-  const path = url.pathname
+  const path = stripBasePath(url.pathname)
 
   if (path === '/rejestracja') {
     return { screen: 'register', verifyStatus: 'invalid' }
@@ -1638,13 +1640,48 @@ function getPathForScreen(screen: PrivateScreen) {
 }
 
 function navigateTo(path: string, setRouteKey: (value: string) => void, replace = false) {
+  const resolvedPath = withBasePath(path)
+
   if (replace) {
-    window.history.replaceState({}, '', path)
+    window.history.replaceState({}, '', resolvedPath)
   } else {
-    window.history.pushState({}, '', path)
+    window.history.pushState({}, '', resolvedPath)
   }
 
   setRouteKey(getRouteKey())
+}
+
+function normalizeBasePath(baseUrl: string) {
+  if (!baseUrl || baseUrl === '/') {
+    return ''
+  }
+
+  const normalized = baseUrl.startsWith('/') ? baseUrl : `/${baseUrl}`
+  return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized
+}
+
+function stripBasePath(pathname: string) {
+  if (!APP_BASE_PATH) {
+    return pathname
+  }
+
+  if (pathname === APP_BASE_PATH) {
+    return '/'
+  }
+
+  if (pathname.startsWith(`${APP_BASE_PATH}/`)) {
+    return pathname.slice(APP_BASE_PATH.length)
+  }
+
+  return pathname
+}
+
+function withBasePath(path: string) {
+  if (!APP_BASE_PATH || path === APP_BASE_PATH || path.startsWith(`${APP_BASE_PATH}/`)) {
+    return path
+  }
+
+  return path === '/' ? `${APP_BASE_PATH}/` : `${APP_BASE_PATH}${path}`
 }
 
 function mapFirebaseUser(firebaseUser: FirebaseUser | null): SessionUser | null {
