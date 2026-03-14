@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JavaPath Dashboard Redesign</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0e0e12;
+        --panel: #16161e;
+        --panel-alt: #1b1b25;
+        --border: #222230;
+        --border-strong: #303044;
+        --text: #e8e8f0;
+        --muted: #6b6b85;
+        --muted-soft: #8a8aa4;
+        --orange: #f89820;
+        --orange-soft: rgba(248, 152, 32, 0.14);
+        --teal: #00d4b4;
+        --teal-soft: rgba(0, 212, 180, 0.14);
+        --red: #ff4757;
+        --locked: #2a2a3a;
+        --radius: 12px;
+        --shadow:
+          0 16px 40px rgba(0, 0, 0, 0.28),
+          0 6px 18px rgba(0, 0, 0, 0.2);
+        --shadow-hover:
+          0 22px 50px rgba(0, 0, 0, 0.34),
+          0 10px 24px rgba(0, 0, 0, 0.24);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(circle at top left, rgba(248, 152, 32, 0.08), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(0, 212, 180, 0.08), transparent 22%),
+          var(--bg);
+        color: var(--text);
+        font-family: "Inter", sans-serif;
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .dashboard-shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 288px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        padding: 24px 18px 18px;
+        border-right: 1px solid var(--border);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 24%),
+          rgba(14, 14, 18, 0.96);
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 4px 6px 16px;
+      }
+
+      .brand-mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        color: var(--bg);
+        background: linear-gradient(135deg, var(--orange), #ffb54f);
+      }
+
+      .brand-copy small,
+      .section-label {
+        display: block;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .brand-copy strong {
+        display: block;
+        margin-top: 4px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 20px;
+        color: var(--orange);
+      }
+
+      .user-card,
+      .level-card,
+      .dashboard-card,
+      .course-map {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+
+      .user-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, rgba(248, 152, 32, 0.18), rgba(0, 212, 180, 0.18));
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+      }
+
+      .user-card strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .user-card span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .level-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .level-card.active {
+        border-left: 3px solid var(--orange);
+        background: var(--panel-alt);
+      }
+
+      .level-toggle {
+        width: 100%;
+        padding: 14px 14px 14px 16px;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        text-align: left;
+      }
+
+      .level-badge,
+      .xp-badge,
+      .status-chip,
+      .stat-pill {
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .level-badge {
+        min-width: 40px;
+        height: 32px;
+        padding: 0 10px;
+        background: rgba(248, 152, 32, 0.12);
+        color: var(--orange);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .level-copy strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 15px;
+      }
+
+      .level-progress {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .chevron {
+        width: 18px;
+        height: 18px;
+        transition: transform 160ms ease;
+      }
+
+      .level-card[data-open="true"] .chevron {
+        transform: rotate(180deg);
+      }
+
+      .level-body {
+        display: none;
+        padding: 0 14px 14px 16px;
+      }
+
+      .level-card[data-open="true"] .level-body {
+        display: block;
+      }
+
+      .level-mini-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 8px;
+      }
+
+      .level-mini-list li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted-soft);
+        font-size: 13px;
+      }
+
+      .level-mini-list li strong {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        display: flex;
+        gap: 10px;
+      }
+
+      .icon-only {
+        position: relative;
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--panel);
+        color: var(--muted-soft);
+        display: grid;
+        place-items: center;
+      }
+
+      .icon-only::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #111118;
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-size: 12px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 160ms ease;
+      }
+
+      .icon-only:hover::after {
+        opacity: 1;
+      }
+
+      .main-area {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        min-height: 72px;
+        padding: 18px 28px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(14, 14, 18, 0.88);
+        backdrop-filter: blur(14px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted-soft);
+        font-size: 14px;
+      }
+
+      .breadcrumb strong {
+        color: var(--text);
+      }
+
+      .topbar-stats {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .stat-pill {
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        gap: 10px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .content {
+        padding: 24px 28px 30px;
+        display: grid;
+        gap: 24px;
+      }
+
+      .hero-strip {
+        position: relative;
+        min-height: 80px;
+        padding: 18px 20px 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background:
+          linear-gradient(110deg, rgba(255, 255, 255, 0.03), transparent 34%),
+          linear-gradient(120deg, #16161e, #1b1b27 60%, rgba(248, 152, 32, 0.08));
+        box-shadow: var(--shadow);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      .hero-copy h1 {
+        margin: 6px 0 4px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 24px;
+      }
+
+      .hero-copy p,
+      .card-title p,
+      .course-map-title p,
+      .empty-state p,
+      .challenge-extra p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .primary-cta,
+      .secondary-cta {
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 12px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .primary-cta {
+        border: 0;
+        background: linear-gradient(135deg, var(--orange), #ffb14c);
+        color: #0e0e12;
+      }
+
+      .secondary-cta {
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+      }
+
+      .cta-arrow {
+        transition: transform 160ms ease;
+      }
+
+      .primary-cta:hover .cta-arrow {
+        transform: translateX(4px);
+      }
+
+      .hero-progress {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .hero-progress span {
+        display: block;
+        width: 16%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--orange), var(--teal));
+      }
+    </style>
+  </head>
+  <body></body>
+</html>

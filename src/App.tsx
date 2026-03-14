@@ -1,5 +1,18 @@
-import { startTransition, useEffect, useState } from 'react'
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import {
+  createUserWithEmailAndPassword,
+  deleteUser,
+  onAuthStateChanged,
+  reload,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  updateProfile,
+  type User as FirebaseUser,
+} from 'firebase/auth'
+import { get, ref, remove, serverTimestamp, update } from 'firebase/database'
 import {
   ChevronDown,
   ChevronRight,
@@ -14,16 +27,45 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react'
-import { courseTracks, dashboardStats, lesson, quizQuestions, type CourseTrack, type ModuleStatus } from './courseData'
+import { dashboardStats, lesson, quizQuestions, courseTracks, type CourseTrack, type ModuleStatus } from './courseData'
+import {
+  AuthPage,
+  EmailVerificationPage,
+  FirstRunOverlay,
+  VerificationResultPage,
+  type AuthMode,
+  type AuthSubmitResult,
+  type UserGoal,
+  type VerifyResultStatus,
+} from './AuthScreens'
+import { auth, db, googleProvider } from './firebase'
+import { LandingPage } from './LandingPage'
 import { LessonSession } from './LessonSession'
+import { SettingsPage, type ProfileState, type SettingsState } from './SettingsPage'
 
-type Screen = 'dashboard' | 'lesson' | 'quiz'
+type PrivateScreen = 'dashboard' | 'lesson' | 'quiz' | 'settings'
+type PublicScreen = 'landing' | 'register' | 'login' | 'verify-email' | 'verify-result'
+type AppScreen = PrivateScreen | PublicScreen
 type ToastTone = 'neutral' | 'success' | 'error'
 
 type ToastState = {
   message: string
   tone: ToastTone
 } | null
+
+type PendingRegistration = {
+  email: string
+  name: string
+}
+
+type SessionUser = {
+  uid: string
+  email: string
+  name: string
+  goal: UserGoal | null
+  emailVerified: boolean
+  provider: 'password' | 'google'
+}
 
 const statusLabel: Record<ModuleStatus, string> = {
   locked: 'Zablokowany',
@@ -39,20 +81,65 @@ const statusClass: Record<ModuleStatus, string> = {
   review: 'module-pill review',
 }
 
+const defaultSettingsState: SettingsState = {
+  themeMode: 'dark',
+  bodyTextSize: 'normal',
+  editorFont: 'fira',
+  editorFontSize: 14,
+  editorLigatures: true,
+  animationsEnabled: true,
+  dailyGoal: 15,
+  hintLevel: 'standard',
+  autoRunExamples: false,
+  confirmBeforeSolution: true,
+  spacedRepetitionEnabled: true,
+  interfaceLanguage: 'pl',
+  emailStreakReminder: true,
+  emailWeeklySummary: true,
+  emailNewContent: false,
+  browserReminders: false,
+  browserReminderTime: '19:00',
+  browserStreakWarning: true,
+  profileVisibility: 'private',
+  analyticsEnabled: true,
+}
+
+function createDefaultProfileState(name = ''): ProfileState {
+  return {
+    fullName: name,
+    username: '',
+    timezone: getDefaultTimezone(),
+    avatarDataUrl: null,
+  }
+}
+
 function App() {
-  const [screen, setScreen] = useState<Screen>('dashboard')
+  const [routeKey, setRouteKey] = useState(() => getRouteKey())
+  const route = useMemo(() => parseRoute(routeKey), [routeKey])
+  const [pendingRegistration, setPendingRegistration] = useState<PendingRegistration | null>(null)
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null)
+  const [profileState, setProfileState] = useState<ProfileState>(() => createDefaultProfileState())
+  const [settingsState, setSettingsState] = useState<SettingsState>(defaultSettingsState)
+  const [authReady, setAuthReady] = useState(false)
+  const [databaseReady, setDatabaseReady] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [lessonComplete, setLessonComplete] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [xp, setXp] = useState(dashboardStats.xp)
   const [streak, setStreak] = useState(dashboardStats.streak)
+  const [totalMinutes, setTotalMinutes] = useState(0)
+  const [longestStreak, setLongestStreak] = useState(0)
   const [streakPulse, setStreakPulse] = useState(false)
   const [quizIndex, setQuizIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [quizScore, setQuizScore] = useState(0)
   const [quizFinished, setQuizFinished] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [toast, setToast] = useState<ToastState>(null)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [selectedGoal, setSelectedGoal] = useState<UserGoal | null>(null)
+  const [startLessonPulse, setStartLessonPulse] = useState(false)
+  const lastPersistedStateRef = useRef('')
+  const databaseWriteErrorShownRef = useRef(false)
   const visibleTracks = buildVisibleTracks(lessonComplete)
   const allModules = visibleTracks.flatMap((track) => track.modules)
   const totalModules = allModules.length
@@ -60,64 +147,437 @@ function App() {
   const progressPercentage = Math.round((completedModules / totalModules) * 100)
   const reviewModules = allModules.filter((module) => module.status === 'review')
   const profileLevel = Math.max(1, Math.floor(xp / 100) + 1)
-
+  const displayName = profileState.fullName.trim() || currentUser?.name || dashboardStats.userName
+  const settingsStats = {
+    totalMinutes,
+    completedLessons: completedModules,
+    totalLessons: totalModules,
+    totalXp: xp,
+    longestStreak,
+  }
   const currentQuestion = quizQuestions[quizIndex]
+  const currentScreen = getScreen(route.screen)
   const activeBreadcrumb =
-    screen === 'dashboard'
+    currentScreen === 'dashboard'
       ? ['Dashboard', 'Twoj postep']
-      : screen === 'quiz'
+      : currentScreen === 'quiz'
         ? [...lesson.breadcrumb, 'Quiz']
         : lesson.breadcrumb
 
-  const showToast = (message: string, tone: ToastTone = 'neutral') => {
-    setToast({ message, tone })
-  }
-
-  const navigate = (nextScreen: Screen) => {
-    setSidebarOpen(false)
-    setSettingsOpen(false)
-    startTransition(() => setScreen(nextScreen))
+  function resetLearningState() {
+    setLessonComplete(false)
+    setShowConfetti(false)
+    setXp(dashboardStats.xp)
+    setStreak(dashboardStats.streak)
+    setTotalMinutes(0)
+    setLongestStreak(0)
+    setStreakPulse(false)
+    setQuizIndex(0)
+    setSelectedAnswer(null)
+    setQuizScore(0)
+    setQuizFinished(false)
+    setStartLessonPulse(false)
   }
 
   useEffect(() => {
-    if (!showConfetti && !streakPulse) {
+    const syncRoute = () => setRouteKey(getRouteKey())
+    window.addEventListener('popstate', syncRoute)
+    return () => window.removeEventListener('popstate', syncRoute)
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setCurrentUser(mapFirebaseUser(firebaseUser))
+      setAuthReady(true)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const loadProgress = async () => {
+      if (!currentUser?.emailVerified) {
+        setDatabaseReady(false)
+        lastPersistedStateRef.current = ''
+        databaseWriteErrorShownRef.current = false
+        return
+      }
+
+      setDatabaseReady(false)
+      try {
+        const userRef = ref(db, `users/${currentUser.uid}`)
+        const snapshot = await get(userRef)
+
+        if (snapshot.exists()) {
+          const data = snapshot.val()
+          const profile = readProfile(data)
+          const settings = readSettings(data)
+          const progress = readProgress(data)
+
+          setXp(progress.xp)
+          setStreak(progress.streak)
+          setTotalMinutes(progress.totalMinutes)
+          setLongestStreak(progress.longestStreak)
+          setLessonComplete(progress.lessonComplete)
+          setQuizIndex(progress.quizIndex)
+          setSelectedAnswer(progress.selectedAnswer)
+          setQuizScore(progress.quizScore)
+          setQuizFinished(progress.quizFinished)
+          setSelectedGoal(profile.goal)
+          setProfileState({
+            fullName: profile.fullName || profile.name || currentUser.name,
+            username: profile.username,
+            timezone: profile.timezone,
+            avatarDataUrl: profile.avatarDataUrl,
+          })
+          setSettingsState(settings)
+          setCurrentUser((value) =>
+            value
+              ? {
+                  ...value,
+                  name: profile.fullName || profile.name || value.name,
+                  goal: profile.goal,
+                }
+              : value,
+          )
+          setNeedsOnboarding(profile.goal === null)
+          lastPersistedStateRef.current = JSON.stringify(
+            buildPersistedPayload({
+              email: currentUser.email,
+              name: profile.fullName || profile.name || currentUser.name,
+              goal: profile.goal,
+              profile: {
+                fullName: profile.fullName || profile.name || currentUser.name,
+                username: profile.username,
+                timezone: profile.timezone,
+                avatarDataUrl: profile.avatarDataUrl,
+              },
+              settings,
+              xp: progress.xp,
+              streak: progress.streak,
+              totalMinutes: progress.totalMinutes,
+              longestStreak: progress.longestStreak,
+              lessonComplete: progress.lessonComplete,
+              quizIndex: progress.quizIndex,
+              selectedAnswer: progress.selectedAnswer,
+              quizScore: progress.quizScore,
+              quizFinished: progress.quizFinished,
+            }),
+          )
+        } else {
+          resetLearningState()
+          setSelectedGoal(null)
+          setProfileState(createDefaultProfileState(currentUser.name))
+          setSettingsState(defaultSettingsState)
+          setCurrentUser((value) => (value ? { ...value, goal: null } : value))
+          setNeedsOnboarding(true)
+          lastPersistedStateRef.current = JSON.stringify(
+            buildPersistedPayload({
+              email: currentUser.email,
+              name: currentUser.name,
+              goal: null,
+              profile: createDefaultProfileState(currentUser.name),
+              settings: defaultSettingsState,
+              xp: dashboardStats.xp,
+              streak: dashboardStats.streak,
+              totalMinutes: 0,
+              longestStreak: 0,
+              lessonComplete: false,
+              quizIndex: 0,
+              selectedAnswer: null,
+              quizScore: 0,
+              quizFinished: false,
+            }),
+          )
+        }
+      } catch (error) {
+        resetLearningState()
+        setSelectedGoal(null)
+        setProfileState(createDefaultProfileState(currentUser.name))
+        setSettingsState(defaultSettingsState)
+        setCurrentUser((value) => (value ? { ...value, goal: null } : value))
+        setNeedsOnboarding(true)
+        lastPersistedStateRef.current = ''
+        showToast(`Nie udalo sie odczytac danych z bazy. Startuje pusty profil. ${mapDatabaseError(error)}`, 'error')
+      } finally {
+        setDatabaseReady(true)
+      }
+    }
+
+    void loadProgress()
+  }, [currentUser?.uid, currentUser?.emailVerified, currentUser?.email, currentUser?.name])
+
+  useEffect(() => {
+    const persistProgress = async () => {
+      if (!currentUser?.emailVerified || !databaseReady) {
+        return
+      }
+
+      const payload = buildPersistedPayload({
+        email: currentUser.email,
+        name: currentUser.name,
+        goal: selectedGoal,
+        profile: profileState,
+        settings: settingsState,
+        xp,
+        streak,
+        totalMinutes,
+        longestStreak,
+        lessonComplete,
+        quizIndex,
+        selectedAnswer,
+        quizScore,
+        quizFinished,
+      })
+
+      const nextKey = JSON.stringify(payload)
+      if (nextKey === lastPersistedStateRef.current) {
+        return
+      }
+
+      try {
+        await update(ref(db, `users/${currentUser.uid}`), {
+          ...payload,
+          meta: {
+            updatedAt: serverTimestamp(),
+          },
+        })
+
+        lastPersistedStateRef.current = nextKey
+        databaseWriteErrorShownRef.current = false
+      } catch (error) {
+        if (!databaseWriteErrorShownRef.current) {
+          databaseWriteErrorShownRef.current = true
+          showToast(`Nie udalo sie zapisac postepu do bazy. ${mapDatabaseError(error)}`, 'error')
+        }
+      }
+    }
+
+    void persistProgress()
+  }, [
+    currentUser?.uid,
+    currentUser?.emailVerified,
+    currentUser?.email,
+    currentUser?.name,
+    databaseReady,
+    lessonComplete,
+    longestStreak,
+    profileState,
+    quizFinished,
+    quizIndex,
+    quizScore,
+    selectedAnswer,
+    selectedGoal,
+    settingsState,
+    streak,
+    totalMinutes,
+    xp,
+  ])
+
+  useEffect(() => {
+    if (!authReady) {
+      return
+    }
+
+    if ((!currentUser || !currentUser.emailVerified) && isPrivateScreen(route.screen)) {
+      navigateTo('/', setRouteKey, true)
+      return
+    }
+
+    if (currentUser?.emailVerified && route.screen === 'landing') {
+      navigateTo('/dashboard', setRouteKey, true)
+      return
+    }
+
+    if (currentUser && !currentUser.emailVerified && route.screen === 'landing') {
+      navigateTo('/weryfikacja-emaila', setRouteKey, true)
+      return
+    }
+
+    if (currentUser?.emailVerified && (route.screen === 'register' || route.screen === 'login' || route.screen === 'verify-email')) {
+      navigateTo('/dashboard', setRouteKey, true)
+      return
+    }
+
+    if (!pendingRegistration && !currentUser && route.screen === 'verify-email') {
+      navigateTo('/rejestracja', setRouteKey, true)
+    }
+  }, [authReady, currentUser, pendingRegistration, route.screen])
+
+  useEffect(() => {
+    if (!showConfetti && !streakPulse && !startLessonPulse) {
       return
     }
 
     const confettiTimer = window.setTimeout(() => setShowConfetti(false), 2000)
     const streakTimer = window.setTimeout(() => setStreakPulse(false), 1000)
+    const pulseTimer = window.setTimeout(() => setStartLessonPulse(false), 2000)
 
     return () => {
       window.clearTimeout(confettiTimer)
       window.clearTimeout(streakTimer)
+      window.clearTimeout(pulseTimer)
     }
-  }, [showConfetti, streakPulse])
+  }, [showConfetti, startLessonPulse, streakPulse])
 
   useEffect(() => {
     if (!toast) {
       return
     }
 
-    const toastTimer = window.setTimeout(() => setToast(null), 2600)
-
-    return () => {
-      window.clearTimeout(toastTimer)
-    }
+    const toastTimer = window.setTimeout(() => setToast(null), 2800)
+    return () => window.clearTimeout(toastTimer)
   }, [toast])
 
-  const resetAppState = () => {
-    setScreen('dashboard')
+  useEffect(() => {
+    const root = document.documentElement
+    const resolvedTheme =
+      settingsState.themeMode === 'system'
+        ? window.matchMedia('(prefers-color-scheme: light)').matches
+          ? 'light'
+          : 'dark'
+        : settingsState.themeMode
+
+    const bodySize = settingsState.bodyTextSize === 'small' ? '13px' : settingsState.bodyTextSize === 'large' ? '17px' : '15px'
+    const editorFamily =
+      settingsState.editorFont === 'jetbrains'
+        ? '"JetBrains Mono", monospace'
+        : settingsState.editorFont === 'source'
+          ? '"Source Code Pro", monospace'
+          : '"Fira Code", monospace'
+
+    root.dataset.theme = resolvedTheme
+    root.dataset.animations = settingsState.animationsEnabled ? 'on' : 'off'
+    root.style.setProperty('--app-body-size', bodySize)
+    root.style.setProperty('--editor-font-size', `${settingsState.editorFontSize}px`)
+    root.style.setProperty('--editor-font-family', editorFamily)
+    root.style.setProperty('--editor-ligatures', settingsState.editorLigatures ? 'normal' : 'none')
+  }, [
+    settingsState.animationsEnabled,
+    settingsState.bodyTextSize,
+    settingsState.editorFont,
+    settingsState.editorFontSize,
+    settingsState.editorLigatures,
+    settingsState.themeMode,
+  ])
+
+  const showToast = (message: string, tone: ToastTone = 'neutral') => {
+    setToast({ message, tone })
+  }
+
+  const navigateApp = (nextScreen: PrivateScreen) => {
     setSidebarOpen(false)
+    startTransition(() => navigateTo(getPathForScreen(nextScreen), setRouteKey))
+  }
+
+  const handleLogout = async () => {
+    setDatabaseReady(false)
+    resetLearningState()
+    setPendingRegistration(null)
+    setNeedsOnboarding(false)
+    setSelectedGoal(null)
+    setProfileState(createDefaultProfileState())
+    setSettingsState(defaultSettingsState)
+    await signOut(auth)
+    navigateTo('/', setRouteKey)
+    showToast('Wylogowano. Wrociles na strone powitalna.', 'success')
+  }
+
+  const handleProfileUpdate = (patch: Partial<ProfileState>) => {
+    setProfileState((value) => ({
+      ...value,
+      ...patch,
+    }))
+
+    if (patch.fullName !== undefined) {
+      setCurrentUser((value) =>
+        value
+          ? {
+              ...value,
+              name: patch.fullName!.trim() || auth.currentUser?.displayName || 'Nowy kursant',
+            }
+          : value,
+      )
+    }
+  }
+
+  const handleSettingsUpdate = (patch: Partial<SettingsState>) => {
+    setSettingsState((value) => ({
+      ...value,
+      ...patch,
+    }))
+  }
+
+  const handleExportData = () => {
+    const exportPayload = {
+      exportedAt: new Date().toISOString(),
+      account: {
+        email: currentUser?.email ?? '',
+        provider: currentUser?.provider ?? 'password',
+        goal: selectedGoal,
+      },
+      profile: profileState,
+      settings: settingsState,
+      progress: {
+        xp,
+        streak,
+        totalMinutes,
+        longestStreak,
+        lessonComplete,
+        quizIndex,
+        selectedAnswer,
+        quizScore,
+        quizFinished,
+      },
+    }
+
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'javapath-data-export.json'
+    anchor.click()
+    URL.revokeObjectURL(url)
+    showToast('Eksport danych jest gotowy.', 'success')
+  }
+
+  const handleResetModuleProgress = () => {
     setLessonComplete(false)
-    setShowConfetti(false)
-    setXp(dashboardStats.xp)
-    setStreak(dashboardStats.streak)
-    setStreakPulse(false)
     setQuizIndex(0)
     setSelectedAnswer(null)
     setQuizScore(0)
     setQuizFinished(false)
-    setSettingsOpen(false)
+    showToast('Postep aktywnego modulu zostal wyzerowany.', 'success')
+  }
+
+  const handleResetAllProgress = () => {
+    resetLearningState()
+    navigateTo('/dashboard', setRouteKey, true)
+    showToast('Caly postep nauki zostal wyzerowany.', 'success')
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!auth.currentUser || !currentUser) {
+      showToast('Nie znaleziono aktywnego konta do usuniecia.', 'error')
+      return
+    }
+
+    try {
+      await remove(ref(db, `users/${currentUser.uid}`))
+      await deleteUser(auth.currentUser)
+      resetLearningState()
+      setCurrentUser(null)
+      setPendingRegistration(null)
+      setSelectedGoal(null)
+      setNeedsOnboarding(false)
+      setProfileState(createDefaultProfileState())
+      setSettingsState(defaultSettingsState)
+      navigateTo('/', setRouteKey, true)
+      showToast('Konto zostalo usuniete.', 'success')
+    } catch (error) {
+      showToast(mapFirebaseError(error), 'error')
+      throw error
+    }
   }
 
   const handleModuleOpen = (status: ModuleStatus, title: string) => {
@@ -126,7 +586,7 @@ function App() {
       return
     }
 
-    navigate('lesson')
+    navigateApp('lesson')
   }
 
   const openQuiz = () => {
@@ -139,20 +599,11 @@ function App() {
     setSelectedAnswer(null)
     setQuizScore(0)
     setQuizFinished(false)
-    navigate('quiz')
-  }
-
-  const openSettings = () => {
-    setSettingsOpen(true)
-  }
-
-  const handleLogout = () => {
-    resetAppState()
-    showToast('Postep zostal wyzerowany do startu.', 'success')
+    navigateApp('quiz')
   }
 
   const openFirstLesson = () => {
-    navigate('lesson')
+    navigateApp('lesson')
   }
 
   const handleReviewAction = () => {
@@ -200,20 +651,300 @@ function App() {
     setLessonComplete(true)
     setShowConfetti(true)
     setStreakPulse(true)
-    setStreak((current) => Math.max(1, current + 1))
+    setStreak((current) => {
+      const nextStreak = Math.max(1, current + 1)
+      setLongestStreak((best) => Math.max(best, nextStreak))
+      return nextStreak
+    })
+    setTotalMinutes((current) => current + 15)
     setXp((current) => current + xpReward)
   }
 
+  const switchAuthMode = (mode: AuthMode) => {
+    navigateTo(mode === 'register' ? '/rejestracja' : '/logowanie', setRouteKey)
+  }
+
+  const handleRegister = async ({
+    email,
+    password,
+    name,
+  }: {
+    email: string
+    password: string
+    name: string
+  }): Promise<AuthSubmitResult> => {
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email, password)
+
+      if (name) {
+        await updateProfile(credential.user, { displayName: name })
+      }
+
+      await sendEmailVerification(credential.user)
+      setPendingRegistration({
+        email,
+        name: name || credential.user.displayName || 'Nowy kursant',
+      })
+      setCurrentUser(mapFirebaseUser(auth.currentUser))
+      navigateTo('/weryfikacja-emaila', setRouteKey)
+
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        field: 'email',
+        message: mapFirebaseError(error),
+      }
+    }
+  }
+
+  const handleLogin = async ({ email, password }: { email: string; password: string }): Promise<AuthSubmitResult> => {
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password)
+      await reload(credential.user)
+      setCurrentUser(mapFirebaseUser(auth.currentUser))
+
+      if (!credential.user.emailVerified) {
+        setPendingRegistration({
+          email: credential.user.email || email,
+          name: credential.user.displayName || 'Nowy kursant',
+        })
+        navigateTo('/weryfikacja-emaila', setRouteKey)
+        return {
+          ok: false,
+          field: 'email',
+          message: 'Konto jest utworzone, ale email nie zostal jeszcze potwierdzony.',
+        }
+      }
+
+      setSelectedGoal(null)
+      setNeedsOnboarding(false)
+      resetLearningState()
+      navigateTo('/dashboard', setRouteKey)
+      showToast('Witaj ponownie. Mozesz kontynuowac nauke.', 'success')
+
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        field: 'form',
+        message: mapFirebaseError(error),
+      }
+    }
+  }
+
+  const handleGoogleContinue = async () => {
+    try {
+      const credential = await signInWithPopup(auth, googleProvider)
+      const nextUser = mapFirebaseUser(credential.user)
+      setCurrentUser(nextUser)
+      setSelectedGoal(null)
+      setNeedsOnboarding(false)
+      resetLearningState()
+      navigateTo('/dashboard', setRouteKey)
+      showToast('Konto Google jest gotowe. Mozesz zaczynac.', 'success')
+
+      return { linkedExisting: !credential.user.metadata.creationTime || credential.user.metadata.creationTime !== credential.user.metadata.lastSignInTime }
+    } catch (error) {
+      throw new Error(mapFirebaseError(error))
+    }
+  }
+
+  const handleCheckVerification = async () => {
+    if (!auth.currentUser) {
+      showToast('Najpierw zaloguj sie na konto, ktore chcesz aktywowac.', 'error')
+      navigateTo('/logowanie', setRouteKey)
+      return
+    }
+
+    await reload(auth.currentUser)
+    const refreshedUser = auth.currentUser
+
+    if (!refreshedUser?.emailVerified) {
+      showToast('Email nie jest jeszcze potwierdzony. Kliknij link z wiadomosci i sprobuj ponownie.', 'neutral')
+      return
+    }
+
+    setCurrentUser(mapFirebaseUser(refreshedUser))
+    setNeedsOnboarding(false)
+    setPendingRegistration(null)
+    resetLearningState()
+    navigateTo('/weryfikuj?token=success', setRouteKey)
+  }
+
+  const handleVerificationPrimary = () => {
+    if (route.verifyStatus === 'success') {
+      navigateTo('/dashboard', setRouteKey)
+      return
+    }
+
+    if (route.verifyStatus === 'used') {
+      navigateTo('/logowanie', setRouteKey)
+      return
+    }
+
+    navigateTo('/weryfikacja-emaila', setRouteKey)
+  }
+
+  const handleVerificationSecondary = () => {
+    if (route.verifyStatus === 'success') {
+      navigateTo('/dashboard', setRouteKey)
+      return
+    }
+
+    if (route.verifyStatus === 'used') {
+      navigateTo('/', setRouteKey)
+      return
+    }
+
+    navigateTo('/rejestracja', setRouteKey)
+  }
+
+  const handleFinishOnboarding = () => {
+    if (currentUser) {
+      const nextGoal = selectedGoal
+      setCurrentUser((value) => (value ? { ...value, goal: nextGoal } : value))
+    }
+
+    setNeedsOnboarding(false)
+    setStartLessonPulse(true)
+  }
+
+  if (route.screen === 'verify-result') {
+    return (
+      <>
+        <VerificationResultPage
+          email={currentUser?.email || pendingRegistration?.email || 'konto@javapath.pl'}
+          name={currentUser?.name || pendingRegistration?.name}
+          status={route.verifyStatus}
+          onPrimaryAction={handleVerificationPrimary}
+          onSecondaryAction={handleVerificationSecondary}
+        />
+        {toast && (
+          <div className={`app-toast ${toast.tone}`} role="status" aria-live="polite">
+            {toast.message}
+          </div>
+        )}
+      </>
+    )
+  }
+
+  if (!authReady) {
+    return null
+  }
+
+  if (currentUser?.emailVerified && !databaseReady) {
+    return (
+      <div className="verify-shell">
+        <section className="verify-card">
+          <p className="eyebrow">JavaPath</p>
+          <h1>Wczytywanie konta...</h1>
+          <p className="verify-copy">Pobieram Twoj profil i zapisany postep z Realtime Database.</p>
+        </section>
+      </div>
+    )
+  }
+
+  if (!currentUser || !currentUser.emailVerified) {
+    return (
+      <>
+        {route.screen === 'landing' && (
+          <LandingPage
+            onLogin={() => navigateTo('/logowanie', setRouteKey)}
+            onStartFree={() => navigateTo('/rejestracja', setRouteKey)}
+          />
+        )}
+
+        {route.screen === 'register' && (
+          <AuthPage
+            mode="register"
+            existingEmails={[]}
+            initialEmail={pendingRegistration?.email}
+            onBack={() => navigateTo('/', setRouteKey)}
+            onSwitchMode={switchAuthMode}
+            onRegister={handleRegister}
+            onLogin={handleLogin}
+            onGoogleContinue={handleGoogleContinue}
+          />
+        )}
+
+        {route.screen === 'login' && (
+          <AuthPage
+            mode="login"
+            existingEmails={[]}
+            initialEmail={pendingRegistration?.email}
+            onBack={() => navigateTo('/', setRouteKey)}
+            onSwitchMode={switchAuthMode}
+            onRegister={handleRegister}
+            onLogin={handleLogin}
+            onGoogleContinue={handleGoogleContinue}
+          />
+        )}
+
+        {route.screen === 'verify-email' && (pendingRegistration || currentUser) && (
+          <EmailVerificationPage
+            email={pendingRegistration?.email || currentUser?.email || 'konto@javapath.pl'}
+            onBackToRegister={() => navigateTo('/rejestracja', setRouteKey)}
+            onResend={async () => {
+              if (auth.currentUser) {
+                await sendEmailVerification(auth.currentUser)
+                showToast('Email weryfikacyjny wyslany ponownie.', 'success')
+              }
+            }}
+            onCheckVerification={handleCheckVerification}
+          />
+        )}
+
+        {toast && (
+          <div className={`app-toast ${toast.tone}`} role="status" aria-live="polite">
+            {toast.message}
+          </div>
+        )}
+      </>
+    )
+  }
+
+  if (currentScreen === 'settings') {
+    return (
+      <>
+        <SettingsPage
+          currentUser={{
+            email: currentUser.email,
+            name: displayName,
+            provider: currentUser.provider,
+          }}
+          profile={profileState}
+          settings={settingsState}
+          stats={settingsStats}
+          goal={selectedGoal}
+          onBack={() => navigateApp('dashboard')}
+          onUpdateProfile={handleProfileUpdate}
+          onUpdateSettings={handleSettingsUpdate}
+          onExportData={handleExportData}
+          onResetModuleProgress={handleResetModuleProgress}
+          onResetAllProgress={handleResetAllProgress}
+          onDeleteAccount={handleDeleteAccount}
+          onShowToast={showToast}
+        />
+        {toast && (
+          <div className={`app-toast ${toast.tone}`} role="status" aria-live="polite">
+            {toast.message}
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${needsOnboarding ? 'app-shell-blurred' : ''}`.trim()}>
       {showConfetti && <ConfettiBurst />}
 
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-copy">
+          <button type="button" className="sidebar-home-button sidebar-copy" onClick={() => navigateApp('dashboard')}>
             <p className="eyebrow">Java learning path</p>
             <h1>JavaPath</h1>
-          </div>
+          </button>
           <button
             type="button"
             className="icon-button mobile-only"
@@ -225,11 +956,11 @@ function App() {
         </div>
 
         <section className="profile-card">
-          <div className="avatar-ring">JP</div>
-          <div className="profile-copy">
-            <strong>{dashboardStats.userName}</strong>
+          <div className="avatar-ring">{getInitials(displayName)}</div>
+          <button type="button" className="profile-home-button profile-copy" onClick={() => navigateApp('dashboard')}>
+            <strong>{displayName}</strong>
             <p>Poziom {profileLevel}</p>
-          </div>
+          </button>
           <div className="xp-chip">
             <Zap size={14} />
             <span>{xp} XP</span>
@@ -248,9 +979,9 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <button type="button" className="ghost-link" onClick={openSettings}>
+          <button type="button" className="ghost-link" onClick={() => navigateApp('settings')}>
             <Settings size={16} />
-            <span>Settings</span>
+            <span>Ustawienia</span>
           </button>
           <button type="button" className="ghost-link" onClick={handleLogout}>
             <LogOut size={16} />
@@ -259,7 +990,9 @@ function App() {
         </div>
       </aside>
 
-      {sidebarOpen && <button type="button" className="sidebar-backdrop" aria-label="Zamknij menu" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && (
+        <button type="button" className="sidebar-backdrop" aria-label="Zamknij menu" onClick={() => setSidebarOpen(false)} />
+      )}
 
       <div className="workspace">
         <header className="topbar">
@@ -296,19 +1029,23 @@ function App() {
           </div>
         </header>
 
-        <main className={`main-panel ${screen === 'quiz' ? 'quiz-open' : ''}`}>
-          {screen === 'dashboard' && (
+        <main className={`main-panel ${currentScreen === 'quiz' ? 'quiz-open' : ''}`}>
+          {currentScreen === 'dashboard' && (
             <section className="dashboard">
               <section className="hero-strip">
                 <div>
                   <p className="eyebrow">Dark IDE meets learning game</p>
-                  <h2>Zacznij nauke Javy od zera. Twoja seria: {streak} dni.</h2>
+                  <h2>Witaj, {displayName}. Twoja seria: {streak} dni.</h2>
                   <p>
                     Konto startuje bez postepu. Otworz pierwsza lekcje, uruchom kod w przegladarce i odblokuj dalsze
                     elementy platformy.
                   </p>
                 </div>
-                <button type="button" className="primary-button" onClick={openFirstLesson}>
+                <button
+                  type="button"
+                  className={`primary-button ${startLessonPulse ? 'primary-button-pulse' : ''}`.trim()}
+                  onClick={openFirstLesson}
+                >
                   Rozpocznij pierwsza lekcje
                   <ChevronRight size={16} />
                 </button>
@@ -330,7 +1067,9 @@ function App() {
                       <span>{progressPercentage}%</span>
                     </div>
                     <div className="card-copy">
-                      <strong>{completedModules} z {totalModules} modulow</strong>
+                      <strong>
+                        {completedModules} z {totalModules} modulow
+                      </strong>
                       <p>Startujesz bez historii. Pierwszy ukonczony modul odblokuje XP, streak i quiz.</p>
                     </div>
                   </div>
@@ -383,7 +1122,9 @@ function App() {
                         : 'Challenge startuje dopiero po pierwszym sukcesie, zeby nie wrzucac nowego uzytkownika na gleboka wode.'}
                     </p>
                     <div className="challenge-meta">
-                      <span className={`tag ${lessonComplete ? 'success' : 'warning'}`}>{lessonComplete ? '40 XP' : 'Zablokowane'}</span>
+                      <span className={`tag ${lessonComplete ? 'success' : 'warning'}`}>
+                        {lessonComplete ? '40 XP' : 'Zablokowane'}
+                      </span>
                       <button type="button" className="text-link" onClick={openFirstLesson}>
                         {lessonComplete ? 'Otworz zadanie' : 'Przejdz do lekcji'}
                       </button>
@@ -422,18 +1163,18 @@ function App() {
             </section>
           )}
 
-          {screen === 'lesson' && (
+          {currentScreen === 'lesson' && (
             <LessonSession
               lessonComplete={lessonComplete}
               onAwardXp={(xpValue) => setXp((current) => current + xpValue)}
               onLessonCompleted={handleLessonCompleted}
-              onBackToDashboard={() => navigate('dashboard')}
+              onBackToDashboard={() => navigateApp('dashboard')}
               onOpenQuiz={openQuiz}
               onShowToast={showToast}
             />
           )}
 
-          {screen === 'quiz' && (
+          {currentScreen === 'quiz' && (
             <section className="quiz-overlay">
               {!quizFinished ? (
                 <div className="quiz-card">
@@ -480,7 +1221,7 @@ function App() {
                   </div>
 
                   <div className="quiz-footer">
-                    <button type="button" className="secondary-button" onClick={() => navigate('lesson')}>
+                    <button type="button" className="secondary-button" onClick={() => navigateApp('lesson')}>
                       Wroc do lekcji
                     </button>
                     <button
@@ -504,7 +1245,7 @@ function App() {
                     <span className="tag success">+60 XP</span>
                     <span className="tag warning">{Math.round((quizScore / quizQuestions.length) * 100)}% skutecznosci</span>
                   </div>
-                  <button type="button" className="primary-button" onClick={() => navigate('dashboard')}>
+                  <button type="button" className="primary-button" onClick={() => navigateApp('dashboard')}>
                     Wroc na dashboard
                   </button>
                 </div>
@@ -514,56 +1255,18 @@ function App() {
         </main>
       </div>
 
-      {settingsOpen && (
-        <div className="modal-backdrop" role="presentation" onClick={() => setSettingsOpen(false)}>
-          <section
-            className="settings-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="settings-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="settings-header">
-              <div>
-                <p className="eyebrow">Ustawienia</p>
-                <h2 id="settings-title">Preferencje nauki</h2>
-              </div>
-              <button type="button" className="icon-button" aria-label="Zamknij ustawienia" onClick={() => setSettingsOpen(false)}>
-                <XCircle size={18} />
-              </button>
-            </div>
-
-            <div className="settings-grid">
-              <article className="settings-card">
-                <strong>Postep lokalny</strong>
-                <p>Masz zapisany start kursu od zera. Postep rosl bedzie wraz z kolejnymi ukonczonymi modulami.</p>
-              </article>
-              <article className="settings-card">
-                <strong>Motyw</strong>
-                <p>Domyslny motyw to ciemny interfejs inspirowany IDE. Jasny motyw mozna dodac jako kolejny wariant.</p>
-              </article>
-              <article className="settings-card">
-                <strong>Tempo nauki</strong>
-                <p>Najlepszy efekt daje praca w krotkich sesjach: 20-30 minut i jedno zadanie praktyczne na raz.</p>
-              </article>
-            </div>
-
-            <div className="settings-actions">
-              <button type="button" className="secondary-button" onClick={handleLogout}>
-                Wyzeruj postep
-              </button>
-              <button type="button" className="primary-button" onClick={() => setSettingsOpen(false)}>
-                Zamknij
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
       {toast && (
         <div className={`app-toast ${toast.tone}`} role="status" aria-live="polite">
           {toast.message}
         </div>
+      )}
+
+      {needsOnboarding && (
+        <FirstRunOverlay
+          selectedGoal={selectedGoal}
+          onSelectGoal={setSelectedGoal}
+          onContinue={handleFinishOnboarding}
+        />
       )}
     </div>
   )
@@ -691,6 +1394,380 @@ function buildVisibleTracks(lessonComplete: boolean) {
       modules,
     }
   })
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+
+  if (parts.length === 0) {
+    return 'JP'
+  }
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+function getRouteKey() {
+  return `${window.location.pathname}${window.location.search}`
+}
+
+function parseRoute(routeKey: string): { screen: AppScreen; verifyStatus: VerifyResultStatus } {
+  const url = new URL(routeKey, window.location.origin)
+  const path = url.pathname
+
+  if (path === '/rejestracja') {
+    return { screen: 'register', verifyStatus: 'invalid' }
+  }
+
+  if (path === '/logowanie') {
+    return { screen: 'login', verifyStatus: 'invalid' }
+  }
+
+  if (path === '/weryfikacja-emaila') {
+    return { screen: 'verify-email', verifyStatus: 'invalid' }
+  }
+
+  if (path === '/weryfikuj') {
+    return {
+      screen: 'verify-result',
+      verifyStatus: parseVerifyStatus(url.searchParams.get('token')),
+    }
+  }
+
+  if (path === '/dashboard') {
+    return { screen: 'dashboard', verifyStatus: 'invalid' }
+  }
+
+  if (path === '/lekcja') {
+    return { screen: 'lesson', verifyStatus: 'invalid' }
+  }
+
+  if (path === '/quiz') {
+    return { screen: 'quiz', verifyStatus: 'invalid' }
+  }
+
+  if (path === '/ustawienia') {
+    return { screen: 'settings', verifyStatus: 'invalid' }
+  }
+
+  return { screen: 'landing', verifyStatus: 'invalid' }
+}
+
+function parseVerifyStatus(token: string | null): VerifyResultStatus {
+  if (token === 'success') {
+    return 'success'
+  }
+
+  if (token === 'expired') {
+    return 'expired'
+  }
+
+  if (token === 'used') {
+    return 'used'
+  }
+
+  return 'invalid'
+}
+
+function isPrivateScreen(screen: AppScreen): screen is PrivateScreen {
+  return screen === 'dashboard' || screen === 'lesson' || screen === 'quiz' || screen === 'settings'
+}
+
+function getScreen(screen: AppScreen): PrivateScreen {
+  if (screen === 'lesson' || screen === 'quiz' || screen === 'settings') {
+    return screen
+  }
+
+  return 'dashboard'
+}
+
+function getPathForScreen(screen: PrivateScreen) {
+  if (screen === 'lesson') {
+    return '/lekcja'
+  }
+
+  if (screen === 'quiz') {
+    return '/quiz'
+  }
+
+  if (screen === 'settings') {
+    return '/ustawienia'
+  }
+
+  return '/dashboard'
+}
+
+function navigateTo(path: string, setRouteKey: (value: string) => void, replace = false) {
+  if (replace) {
+    window.history.replaceState({}, '', path)
+  } else {
+    window.history.pushState({}, '', path)
+  }
+
+  setRouteKey(getRouteKey())
+}
+
+function mapFirebaseUser(firebaseUser: FirebaseUser | null): SessionUser | null {
+  if (!firebaseUser || !firebaseUser.email) {
+    return null
+  }
+
+  const providerIds = firebaseUser.providerData.map((entry) => entry.providerId)
+
+  return {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    name: firebaseUser.displayName || 'Nowy kursant',
+    goal: null,
+    emailVerified: firebaseUser.emailVerified,
+    provider: providerIds.includes('google.com') ? 'google' : 'password',
+  }
+}
+
+function buildPersistedPayload({
+  email,
+  name,
+  goal,
+  profile,
+  settings,
+  xp,
+  streak,
+  totalMinutes,
+  longestStreak,
+  lessonComplete,
+  quizIndex,
+  selectedAnswer,
+  quizScore,
+  quizFinished,
+}: {
+  email: string
+  name: string
+  goal: UserGoal | null
+  profile: ProfileState
+  settings: SettingsState
+  xp: number
+  streak: number
+  totalMinutes: number
+  longestStreak: number
+  lessonComplete: boolean
+  quizIndex: number
+  selectedAnswer: number | null
+  quizScore: number
+  quizFinished: boolean
+}) {
+  return {
+    profile: {
+      email,
+      name,
+      goal,
+      fullName: profile.fullName,
+      username: profile.username,
+      timezone: profile.timezone,
+      avatarDataUrl: profile.avatarDataUrl,
+    },
+    settings,
+    progress: {
+      xp,
+      streak,
+      totalMinutes,
+      longestStreak,
+      lessonComplete,
+      quizIndex,
+      selectedAnswer,
+      quizScore,
+      quizFinished,
+    },
+  }
+}
+
+function readProfile(data: Record<string, unknown>) {
+  const rawProfile = isRecord(data.profile) ? data.profile : {}
+  const goal = rawProfile.goal
+
+  return {
+    name: typeof rawProfile.name === 'string' ? rawProfile.name : '',
+    goal: isGoal(goal) ? goal : null,
+    fullName: typeof rawProfile.fullName === 'string' ? rawProfile.fullName : '',
+    username: typeof rawProfile.username === 'string' ? rawProfile.username : '',
+    timezone: typeof rawProfile.timezone === 'string' ? rawProfile.timezone : getDefaultTimezone(),
+    avatarDataUrl: typeof rawProfile.avatarDataUrl === 'string' ? rawProfile.avatarDataUrl : null,
+  }
+}
+
+function readSettings(data: Record<string, unknown>): SettingsState {
+  const rawSettings = isRecord(data.settings) ? data.settings : {}
+
+  return {
+    themeMode: isThemeMode(rawSettings.themeMode) ? rawSettings.themeMode : defaultSettingsState.themeMode,
+    bodyTextSize: isBodyTextSize(rawSettings.bodyTextSize) ? rawSettings.bodyTextSize : defaultSettingsState.bodyTextSize,
+    editorFont: isEditorFont(rawSettings.editorFont) ? rawSettings.editorFont : defaultSettingsState.editorFont,
+    editorFontSize: isEditorFontSize(rawSettings.editorFontSize) ? rawSettings.editorFontSize : defaultSettingsState.editorFontSize,
+    editorLigatures: toBoolean(rawSettings.editorLigatures, defaultSettingsState.editorLigatures),
+    animationsEnabled: toBoolean(rawSettings.animationsEnabled, defaultSettingsState.animationsEnabled),
+    dailyGoal: isDailyGoal(rawSettings.dailyGoal) ? rawSettings.dailyGoal : defaultSettingsState.dailyGoal,
+    hintLevel: isHintLevel(rawSettings.hintLevel) ? rawSettings.hintLevel : defaultSettingsState.hintLevel,
+    autoRunExamples: toBoolean(rawSettings.autoRunExamples, defaultSettingsState.autoRunExamples),
+    confirmBeforeSolution: toBoolean(rawSettings.confirmBeforeSolution, defaultSettingsState.confirmBeforeSolution),
+    spacedRepetitionEnabled: toBoolean(rawSettings.spacedRepetitionEnabled, defaultSettingsState.spacedRepetitionEnabled),
+    interfaceLanguage: isInterfaceLanguage(rawSettings.interfaceLanguage) ? rawSettings.interfaceLanguage : defaultSettingsState.interfaceLanguage,
+    emailStreakReminder: toBoolean(rawSettings.emailStreakReminder, defaultSettingsState.emailStreakReminder),
+    emailWeeklySummary: toBoolean(rawSettings.emailWeeklySummary, defaultSettingsState.emailWeeklySummary),
+    emailNewContent: toBoolean(rawSettings.emailNewContent, defaultSettingsState.emailNewContent),
+    browserReminders: toBoolean(rawSettings.browserReminders, defaultSettingsState.browserReminders),
+    browserReminderTime: typeof rawSettings.browserReminderTime === 'string' ? rawSettings.browserReminderTime : defaultSettingsState.browserReminderTime,
+    browserStreakWarning: toBoolean(rawSettings.browserStreakWarning, defaultSettingsState.browserStreakWarning),
+    profileVisibility: isProfileVisibility(rawSettings.profileVisibility) ? rawSettings.profileVisibility : defaultSettingsState.profileVisibility,
+    analyticsEnabled: toBoolean(rawSettings.analyticsEnabled, defaultSettingsState.analyticsEnabled),
+  }
+}
+
+function readProgress(data: Record<string, unknown>) {
+  const rawProgress = isRecord(data.progress) ? data.progress : {}
+
+  return {
+    xp: toNumber(rawProgress.xp, dashboardStats.xp),
+    streak: toNumber(rawProgress.streak, dashboardStats.streak),
+    totalMinutes: toNumber(rawProgress.totalMinutes, 0),
+    longestStreak: toNumber(rawProgress.longestStreak, 0),
+    lessonComplete: Boolean(rawProgress.lessonComplete),
+    quizIndex: clamp(toNumber(rawProgress.quizIndex, 0), 0, Math.max(quizQuestions.length - 1, 0)),
+    selectedAnswer: rawProgress.selectedAnswer === null || rawProgress.selectedAnswer === undefined
+      ? null
+      : clamp(toNumber(rawProgress.selectedAnswer, 0), 0, 3),
+    quizScore: toNumber(rawProgress.quizScore, 0),
+    quizFinished: Boolean(rawProgress.quizFinished),
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isGoal(value: unknown): value is UserGoal {
+  return value === 'career' || value === 'study' || value === 'project' || value === 'curious'
+}
+
+function isThemeMode(value: unknown): value is SettingsState['themeMode'] {
+  return value === 'dark' || value === 'light' || value === 'system'
+}
+
+function isBodyTextSize(value: unknown): value is SettingsState['bodyTextSize'] {
+  return value === 'small' || value === 'normal' || value === 'large'
+}
+
+function isEditorFont(value: unknown): value is SettingsState['editorFont'] {
+  return value === 'fira' || value === 'jetbrains' || value === 'source'
+}
+
+function isEditorFontSize(value: unknown): value is SettingsState['editorFontSize'] {
+  return value === 12 || value === 14 || value === 16 || value === 18
+}
+
+function isDailyGoal(value: unknown): value is SettingsState['dailyGoal'] {
+  return value === 5 || value === 10 || value === 15 || value === 20 || value === 30
+}
+
+function isHintLevel(value: unknown): value is SettingsState['hintLevel'] {
+  return value === 'helpful' || value === 'standard' || value === 'demanding'
+}
+
+function isInterfaceLanguage(value: unknown): value is SettingsState['interfaceLanguage'] {
+  return value === 'pl' || value === 'en'
+}
+
+function isProfileVisibility(value: unknown): value is SettingsState['profileVisibility'] {
+  return value === 'private' || value === 'public'
+}
+
+function toNumber(value: unknown, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function toBoolean(value: unknown, fallback: boolean) {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function getDefaultTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Warsaw'
+}
+
+function mapFirebaseError(error: unknown) {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return 'Cos poszlo nie tak. Sprobuj ponownie za chwile.'
+  }
+
+  const code = String(error.code)
+  const message = 'message' in error ? String(error.message) : ''
+
+  if (code === 'auth/email-already-in-use') {
+    return 'Konto z tym adresem juz istnieje. Zaloguj sie albo odzyskaj haslo.'
+  }
+
+  if (code === 'auth/invalid-email') {
+    return 'Adres email jest niepoprawny.'
+  }
+
+  if (code === 'auth/weak-password') {
+    return 'Haslo jest za slabe. Uzyj co najmniej 8 znakow i jednej cyfry.'
+  }
+
+  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+    return 'Niepoprawny email lub haslo.'
+  }
+
+  if (code === 'auth/popup-closed-by-user') {
+    return 'Logowanie Google zostalo przerwane przed zakonczeniem.'
+  }
+
+  if (code === 'auth/unauthorized-domain') {
+    return 'Ta domena nie jest dodana w Firebase jako dozwolona dla logowania Google.'
+  }
+
+  if (code === 'auth/operation-not-allowed') {
+    return 'Logowanie Google nie jest wlaczone w Firebase Authentication.'
+  }
+
+  if (code === 'auth/popup-blocked') {
+    return 'Przegladarka zablokowala okno logowania Google. Zezwol na popupy i sprobuj ponownie.'
+  }
+
+  if (code === 'auth/too-many-requests') {
+    return 'Za duzo prob. Odczekaj chwile i sprobuj ponownie.'
+  }
+
+  if (code === 'auth/requires-recent-login') {
+    return 'Ta operacja wymaga ponownego zalogowania. Zaloguj sie jeszcze raz i sprobuj ponownie.'
+  }
+
+  return `Nieznany blad Firebase: ${code}${message ? ` (${message})` : ''}`
+}
+
+function mapDatabaseError(error: unknown) {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return 'Sprawdz reguly Realtime Database i czy baza jest wlaczona.'
+  }
+
+  const code = String(error.code)
+
+  if (code === 'permission-denied') {
+    return 'Realtime Database odrzucila dostep. Najczesciej oznacza to brak opublikowanych rules albo zle reguly.'
+  }
+
+  if (code === 'failed-precondition') {
+    return 'Realtime Database nie jest jeszcze poprawnie skonfigurowana w projekcie.'
+  }
+
+  if (code === 'unavailable') {
+    return 'Realtime Database jest chwilowo niedostepna albo polaczenie sie urwalo.'
+  }
+
+  return `Kod Realtime Database: ${code}`
 }
 
 export default App
