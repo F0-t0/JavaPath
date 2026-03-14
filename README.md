@@ -61,5 +61,6 @@ npm run java-runner
 ## Uwagi techniczne
 
 - Runner Javy nasluchuje domyslnie na `http://127.0.0.1:4318/run`.
-- To nadal lokalny runner developerski, nie sandbox produkcyjny.
-- Jesli projekt ma trafic publicznie online, nastepnym krokiem powinno byc przeniesienie wykonywania kodu do izolowanego backendu lub uslugi typu Judge0 / wlasny kontener.
+- Lokalnie aplikacja uzywa prostego runnera developerskiego opartego o `javac` i `java`.
+- Publiczna wersja na GitHub Pages korzysta z Judge0 CE do wykonywania kodu Java bez wlasnego hostingu backendu.
+- Jesli projekt ma trafic szerzej do uzytku produkcyjnego, nastepnym krokiem powinien byc wlasny izolowany backend lub self-hosted Judge0 zamiast publicznego endpointu.
